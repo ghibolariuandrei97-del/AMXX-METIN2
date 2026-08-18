@@ -203,6 +203,7 @@ public plugin_init()
 	register_concmd("amx_set_xp",    "cmd_admin_set_xp",    ADMIN_LEVEL_A, "<nume/#userid> <xp>");
 	register_concmd("amx_set_statuspoints", "cmd_admin_set_statuspoints", ADMIN_LEVEL_A, "<nume/#userid> <puncte>");
 	register_concmd("amx_set_skillpoints",  "cmd_admin_set_skillpoints",  ADMIN_LEVEL_A, "<nume/#userid> <puncte>");
+	register_concmd("amx_set_yang", "cmd_admin_set_yang", ADMIN_LEVEL_A, "<nume/#userid> <yang>");
 	
 	cvar_xp_kill         = register_cvar("amx_metin2_xp_kill", "100");
 	cvar_xp_hs           = register_cvar("amx_metin2_xp_hs_bonus", "50");
@@ -1296,6 +1297,30 @@ public cmd_admin_set_statuspoints(id, level, cid)
 	
 	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai setat Status Points lui ^3%n^1 la ^3%d", target, points);
 	client_print_color(target, print_team_default, "^4[Metin2]^1 Un admin ti-a setat Status Points la ^3%d", points);
+	
+	return PLUGIN_HANDLED;
+}
+
+public cmd_admin_set_yang(id, level, cid)
+{
+	if (!cmd_access(id, level, cid, 3))
+		return PLUGIN_HANDLED;
+	
+	new arg[32], arg2[16];
+	read_argv(1, arg, charsmax(arg));
+	read_argv(2, arg2, charsmax(arg2));
+	
+	new target = cmd_target(id, arg, CMDTARGET_NO_BOTS);
+	if (!target) return PLUGIN_HANDLED;
+	
+	new yang = str_to_num(arg2);
+	if (yang < 0) yang = 0;
+	
+	g_Player[target][g_Yang] = yang;
+	save_player(target);
+	
+	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai setat Yang-ul lui ^3%n^1 la ^3%d", target, yang);
+	client_print_color(target, print_team_default, "^4[Metin2]^1 Un admin ti-a setat Yang-ul la ^3%d", yang);
 	
 	return PLUGIN_HANDLED;
 }
