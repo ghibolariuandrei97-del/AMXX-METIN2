@@ -35,6 +35,7 @@
 #define SLOT_SHOES           4
 #define SLOT_JEWEL           5
 #define MAX_EQUIP_SLOTS      6
+#define MAX_ITEMS 64
 
 enum _:PlayerData
 {
@@ -58,6 +59,16 @@ enum _:PlayerData
 	g_MaxMP
 };
 
+enum _:ItemStruct
+{
+	ItemName[32],
+	ItemSlot,
+	ItemReqLevel,
+	ItemBonusType,
+	ItemBaseVal,
+	ItemRaceReq
+}
+
 new g_Player[MAX_PLAYERS + 1][PlayerData];
 new g_Vault = INVALID_HANDLE;
 new g_HudSync;
@@ -71,6 +82,8 @@ new bool:g_BlessActive[MAX_PLAYERS + 1];
 new Float:g_ResistAmount[MAX_PLAYERS + 1];
 new Float:g_PierceAmount[MAX_PLAYERS + 1];
 new Float:g_BlessAmount[MAX_PLAYERS + 1];
+new g_Items[MAX_ITEMS][ItemStruct];
+new g_ItemCount = 0
 
 new cvar_xp_kill, cvar_xp_hs, cvar_yang_kill, cvar_yang_hs;
 new cvar_upgrade_destroy;
@@ -160,6 +173,7 @@ public plugin_natives()
 {
 	register_library("metin2_rpg");
 	
+	register_native("m2_register_item", "_m2_register_item");
 	register_native("get_user_m2_level", "_get_user_m2_level");
 	register_native("get_user_m2_xp", "_get_user_m2_xp");
 	register_native("set_user_m2_level", "_set_user_m2_level");
@@ -191,6 +205,8 @@ public plugin_init()
 	register_clcmd("say /shop",     "cmd_shop");
 	register_clcmd("say /magazin",  "cmd_shop");
 	register_clcmd("say /binds",    "cmd_binds");
+	register_clcmd("say /reset",    "cmd_reset");
+
 	
 	register_clcmd("skill1", "cmd_skill1");
 	register_clcmd("skill2", "cmd_skill2");
@@ -259,6 +275,43 @@ public plugin_end()
 }
 
 // ======================== NATIVES ========================
+public _m2_register_item(plugin, params)
+{
+	// Verificăm dacă am atins limita maximă de iteme
+	if (g_ItemCount >= MAX_ITEMS)
+	{
+		log_amx("[Metin2] Nu se mai pot inregistra iteme! Limita de %d a fost atinsa.", MAX_ITEMS);
+		return -1;
+	}
+
+	// Preluăm numele (string)
+	new szName[32];
+	get_string(1, szName, charsmax(szName));
+	
+	// Preluăm restul parametrilor
+	new slot       = get_param(2);
+	new req_level  = get_param(3);
+	new bonus_type = get_param(4);
+	new base_val   = get_param(5);
+	new race_req   = get_param(6);
+
+	// Stocăm datele în array
+	new item_id = g_ItemCount;
+	
+	copy(g_Items[item_id][ItemName], charsmax(g_Items[][ItemName]), szName);
+	g_Items[item_id][ItemSlot]      = slot;
+	g_Items[item_id][ItemReqLevel]  = req_level;
+	g_Items[item_id][ItemBonusType] = bonus_type;
+	g_Items[item_id][ItemBaseVal]   = base_val;
+	g_Items[item_id][ItemRaceReq]   = race_req;
+
+	// Incrementăm contorul global
+	g_ItemCount++;
+
+	// Returnăm ID-ul noului item (0, 1, 2...)
+	return item_id;
+}
+
 public _get_user_m2_level(plugin, params)
 {
 	new id = get_param(1);
@@ -389,10 +442,28 @@ public client_putinserver(id)
 {
 	reset_player(id);
 	load_player(id);
+	
+	set_task(3.0, "Task_WelcomeMsg", id);	// 1.5 secunde e suficient
+}
+
+public Task_WelcomeMsg(id)
+{
+	if (!is_user_connected(id))
+		return;
+	
+	if (g_Player[id][g_Race] == RACE_NONE)
+	{
+		client_print_color(id, print_team_default, "^4[Metin2]^1 Bun venit! Alege-ti rasa cu ^3/menu^1.");
+	}
+	else
+	{
+		client_print_color(id, print_team_default, "^4[Metin2]^1 Date incarcate. Level: ^3%d^1 | Yang: ^3%d", g_Player[id][g_Level], g_Player[id][g_Yang]);
+	}
 }
 
 public client_disconnected(id)
 {
+	remove_task(id);
 	save_player(id);
 	reset_player(id);
 }
@@ -440,6 +511,10 @@ stock reset_player(id)
 	g_ResistAmount[id] = 0.0;
 	g_PierceAmount[id] = 0.0;
 	g_BlessAmount[id] = 0.0;
+
+	remove_task(id);		
+	if (is_user_connected(id))
+		set_user_rendering(id);
 }
 
 stock load_player(id)
@@ -457,12 +532,10 @@ stock load_player(id)
 		g_Player[id][g_Yang] = 5000;
 		g_Player[id][g_MP] = 50;
 		g_Player[id][g_MaxMP] = 50;
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Bun venit! Alege-ti rasa cu ^3/menu^1.");
 	}
 	else
 	{
 		recalc_max_mp(id);
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Date incarcate. Level: ^3%d^1 | Yang: ^3%d", g_Player[id][g_Level], g_Player[id][g_Yang]);
 	}
 }
 
@@ -574,6 +647,19 @@ public OnPlayerSpawn(id)
 {
 	if (!is_user_alive(id))
 		return;
+
+	remove_task(id);
+	set_user_rendering(id);
+
+	g_AuraActive[id] = false;
+	g_ReflectActive[id] = false;
+	g_AmbushActive[id] = false;
+	g_ResistActive[id] = false;
+	g_PierceActive[id] = false;
+	g_BlessActive[id] = false;
+	g_ResistAmount[id] = 0.0;
+	g_PierceAmount[id] = 0.0;
+	g_BlessAmount[id] = 0.0;
 	
 	recalc_max_mp(id);
 	g_Player[id][g_MP] = g_Player[id][g_MaxMP];
@@ -832,20 +918,19 @@ stock skill_warrior(id, slot, lvl)
 		}
 		case 3: // Dash
 		{
-			new Float:origin[3];
-			new Float:angles[3];
-			new Float:vec[3];
-			
-			pev(id, pev_origin, origin);
+			new Float:angles[3], Float:vec[3];
 			pev(id, pev_v_angle, angles);
 			angle_vector(angles, ANGLEVECTOR_FORWARD, vec);
-			
-			origin[0] += vec[0] * (220.0 + lvl * 4.0);
-			origin[1] += vec[1] * (220.0 + lvl * 4.0);
-			
-			set_pev(id, pev_origin, origin);
+	
+			new Float:speed = 900.0 + (lvl * 15.0);		// poți regla
+			vec[0] *= speed;
+			vec[1] *= speed;
+			vec[2] = 150.0;		// puțină înălțime ca să nu se blocheze pe trepte
+	
+			set_pev(id, pev_velocity, vec);
+	
 			apply_skill_cooldown(id, 3, 14.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Atac Sabie: dash inainte! Distanta crescuta cu nivelul.");
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Atac Sabie: dash inainte!");
 		}
 		case 4: // Vartej AoE
 		{
@@ -986,6 +1071,62 @@ public ApplyResidualSlow(id)
 		set_user_maxspeed(id, 150.0);
 		set_task(2.5, "RestoreSpeed", id);
 	}
+}
+
+public cmd_reset(id)
+{
+	if (!is_user_connected(id))
+		return PLUGIN_HANDLED;
+	
+	if (g_Player[id][g_Race] == RACE_NONE)
+	{
+		client_print_color(id, print_team_default, "^4[Metin2]^1 Nu ai inca o rasa aleasa!");
+		return PLUGIN_HANDLED;
+	}
+	
+	new level = g_Player[id][g_Level];
+	
+	// Pastreaza Level, XP, Yang, Inventar, Echipament
+	// Reseteaza rasa + stats + skill-uri
+	
+	g_Player[id][g_Race] = RACE_NONE;
+	
+	g_Player[id][g_STR] = 1;
+	g_Player[id][g_HP]  = 1;
+	g_Player[id][g_DEX] = 1;
+	g_Player[id][g_INT] = 1;
+	
+	// Puncte totale ca la un caracter nou de acelasi level
+	// (5 stat + 3 skill la alegerea rasei) + 1 punct pe fiecare level dupa 1
+	g_Player[id][g_StatPoints]  = 5 + (level - 1);
+	g_Player[id][g_SkillPoints] = 3 + (level - 1);
+	
+	for (new i = 0; i < MAX_SKILLS; i++)
+		g_Player[id][g_SkillLevel][i] = 0;
+	
+	// Opreste buff-uri active
+	g_AuraActive[id] = false;
+	g_ReflectActive[id] = false;
+	g_AmbushActive[id] = false;
+	g_ResistActive[id] = false;
+	g_PierceActive[id] = false;
+	g_BlessActive[id] = false;
+	g_ResistAmount[id] = 0.0;
+	g_PierceAmount[id] = 0.0;
+	g_BlessAmount[id] = 0.0;
+	
+	remove_task(id);
+	if (is_user_alive(id))
+		set_user_rendering(id);
+	
+	recalc_max_mp(id);
+	
+	save_player(id);		// salveaza imediat
+	
+	client_print_color(id, print_team_default, "^4[Metin2]^1 Caracter resetat! Level: ^3%d^1 | Stat Points: ^3%d^1 | Skill Points: ^3%d", level, g_Player[id][g_StatPoints], g_Player[id][g_SkillPoints]);
+	client_print_color(id, print_team_default, "^4[Metin2]^1 Alege noua rasa cu ^3/menu^1.");
+	
+	return PLUGIN_HANDLED;
 }
 
 // ---------- NINJA ----------
@@ -1711,6 +1852,9 @@ public equip_handler(id, menu, item)
 		g_Player[id][g_Inventory][i] = g_Player[id][g_Inventory][i + 1];
 		g_Player[id][g_InventoryUpgrade][i] = g_Player[id][g_InventoryUpgrade][i + 1];
 	}
+
+	g_Player[id][g_Inventory][g_Player[id][g_InventoryCount] - 1] = 0;
+	g_Player[id][g_InventoryUpgrade][g_Player[id][g_InventoryCount] - 1] = 0;
 	g_Player[id][g_InventoryCount]--;
 	
 	recalc_max_mp(id);
@@ -1837,6 +1981,9 @@ public potion_handler(id, menu, item)
 		g_Player[id][g_Inventory][i] = g_Player[id][g_Inventory][i + 1];
 		g_Player[id][g_InventoryUpgrade][i] = g_Player[id][g_InventoryUpgrade][i + 1];
 	}
+
+	g_Player[id][g_Inventory][g_Player[id][g_InventoryCount] - 1] = 0;
+	g_Player[id][g_InventoryUpgrade][g_Player[id][g_InventoryCount] - 1] = 0;
 	g_Player[id][g_InventoryCount]--;
 	
 	save_player(id);
@@ -1920,7 +2067,12 @@ public upgrade_menu_handler(id, menu, item)
 				g_Player[id][g_Inventory][i] = g_Player[id][g_Inventory][i + 1];
 				g_Player[id][g_InventoryUpgrade][i] = g_Player[id][g_InventoryUpgrade][i + 1];
 			}
+
+			// Curățăm ultimul slot și scădem contorul doar dacă itemul a fost distrus
+			g_Player[id][g_Inventory][g_Player[id][g_InventoryCount] - 1] = 0;
+			g_Player[id][g_InventoryUpgrade][g_Player[id][g_InventoryCount] - 1] = 0;
 			g_Player[id][g_InventoryCount]--;
+
 			destroyed = 1;
 			client_print_color(id, print_team_default, "^4[Metin2]^1 ^1FIERARUL A SPART ITEMUL!");
 		}
@@ -1934,7 +2086,7 @@ public upgrade_menu_handler(id, menu, item)
 		new ret;
 		ExecuteForward(g_fwd_UpgradeFail, ret, id, itemid, destroyed);
 	}
-	
+
 	save_player(id);
 	menu_destroy(menu);
 	return PLUGIN_HANDLED;
