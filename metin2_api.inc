@@ -43,18 +43,23 @@
 // ======================== NATIVES ========================
 
 /**
- * Inregistreaza un item nou in baza de date a jocului
+ * Înregistrează un item nou.
+ * Returnează ID-ul itemului (sau -1 la eroare).
  *
- * @param name          Numele itemului (ex: "Sabie Solara")
- * @param slot          Slotul de echipament (M2_SLOT_WEAPON, M2_SLOT_ARMOR etc.)
- * @param req_level     Nivelul minim necesar
- * @param bonus_type    Tipul de bonus (1 = Atac, 2 = Apărare, 3 = HP, 4 = MP)
- * @param base_val      Valoarea bonusului la +0
- * @param race_req      Rasa necesară (M2_RACE_NONE pentru toate)
- *
- * @return              ID-ul noului item generat (sau -1 la esec)
+ * @param name         Numele itemului
+ * @param type         ITEM_WEAPON / ITEM_ARMOR / ITEM_HELMET / ITEM_SHIELD / ITEM_SHOES / ITEM_JEWEL / ITEM_POTION
+ * @param req_level    Level minim (rezervat pentru viitor)
+ * @param race_req     0 = orice rasă, altfel RACE_*
+ * @param str          Bonus STR
+ * @param hp           Bonus HP / Defense
+ * @param dex          Bonus DEX
+ * @param intt         Bonus INT
+ * @param crit         Bonus Crit
+ * @param speed        Bonus Speed
+ * @param price        Preț Yang (0 = nu apare în magazin)
+ * @param potion_type  0 = normal, 1 = HP Potion, 2 = MP Potion
  */
-native m2_register_item(const name[], slot, req_level, bonus_type, base_val, race_req = M2_RACE_NONE);
+native m2_register_item(const name[], type, req_level = 1, race_req = 0, str = 0, hp = 0, dex = 0, intt = 0, crit = 0, speed = 0, price = 0, potion_type = 0);
 
 /**
  * Returneaza level-ul jucatorului
