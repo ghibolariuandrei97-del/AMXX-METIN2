@@ -1,7 +1,8 @@
 /*================================================================================
 	Metin2 RPG Core - CS 1.6
 	AMX Mod X 1.10+ | ReAPI | nVault Array | fun | fakemeta
-	Versiune 1.1 - Skill-uri reale + Mana + Item bonuses + Potions + API + Forwards
+	Versiune 1.2 - Skill-uri reale + Mana + Item bonuses + Potions + API + Forwards
+	             + Sistem iteme 100% dinamic (m2_register_item functional)
 ================================================================================*/
 
 #include <amxmodx>
@@ -14,7 +15,7 @@
 #include <fun>
 
 #define PLUGIN  "Metin2Core"
-#define VERSION "1.0"
+#define VERSION "1.2"
 #define AUTHOR  "Craxor"
 
 #define MAX_PLAYERS          32
@@ -35,7 +36,15 @@
 #define SLOT_SHOES           4
 #define SLOT_JEWEL           5
 #define MAX_EQUIP_SLOTS      6
-#define MAX_ITEMS 64
+#define MAX_ITEMS            64
+
+#define ITEM_WEAPON          1
+#define ITEM_ARMOR           2
+#define ITEM_HELMET          3
+#define ITEM_SHIELD          4
+#define ITEM_SHOES           5
+#define ITEM_JEWEL           6
+#define ITEM_POTION          7
 
 enum _:PlayerData
 {
@@ -62,12 +71,18 @@ enum _:PlayerData
 enum _:ItemStruct
 {
 	ItemName[32],
-	ItemSlot,
+	ItemType,          // 1=Weapon ... 7=Potion
 	ItemReqLevel,
-	ItemBonusType,
-	ItemBaseVal,
-	ItemRaceReq
-}
+	ItemRaceReq,       // 0 = orice rasa
+	ItemStr,
+	ItemHp,
+	ItemDex,
+	ItemInt,
+	ItemCrit,
+	ItemSpeed,
+	ItemPrice,
+	ItemPotionType     // 0=normal, 1=HP Potion, 2=MP Potion
+};
 
 new g_Player[MAX_PLAYERS + 1][PlayerData];
 new g_Vault = INVALID_HANDLE;
@@ -82,8 +97,9 @@ new bool:g_BlessActive[MAX_PLAYERS + 1];
 new Float:g_ResistAmount[MAX_PLAYERS + 1];
 new Float:g_PierceAmount[MAX_PLAYERS + 1];
 new Float:g_BlessAmount[MAX_PLAYERS + 1];
+
 new g_Items[MAX_ITEMS][ItemStruct];
-new g_ItemCount = 0
+new g_ItemCount = 0;
 
 new cvar_xp_kill, cvar_xp_hs, cvar_yang_kill, cvar_yang_hs;
 new cvar_upgrade_destroy;
@@ -105,57 +121,6 @@ new const g_SkillName[MAX_SKILLS][] = {
 
 // Cost mana pe skill (baza)
 new const g_SkillManaCost[5] = { 25, 30, 35, 20, 40 };
-
-// [0]=id [1]=type [2]=str [3]=hp [4]=dex [5]=int [6]=crit [7]=speed [8]=price
-new const g_ItemData[][9] =
-{
-	{0,  0, 0, 0, 0, 0, 0, 0, 0},
-	{1,  1, 5, 0, 2, 0, 3, 0, 15000},
-	{2,  1, 8, 0, 0, 0, 5, 0, 22000},
-	{3,  1, 3, 0, 4, 2, 2, 0, 18000},
-	{4,  2, 0,15, 0, 0, 0, 0, 12000},
-	{5,  2, 2,25, 0, 0, 0, 0, 20000},
-	{6,  3, 1, 5, 1, 0, 0, 0, 8000},
-	{7,  3, 3,10, 2, 0, 1, 0, 15000},
-	{8,  4, 0, 8, 0, 0, 0, 0, 9000},
-	{9,  4, 2,15, 0, 0, 0, 0, 16000},
-	{10, 5, 0, 0, 5, 0, 0,15, 11000},
-	{11, 5, 0, 0, 3, 2, 0,20, 14000},
-	{12, 6, 0, 0, 0, 4, 4, 0, 13000},
-	{13, 6, 2, 5, 2, 2, 2, 0, 17000},
-	// Potions
-	{14, 7, 0, 0, 0, 0, 0, 0, 800},   // HP Potion
-	{15, 7, 0, 0, 0, 0, 0, 0, 900}    // MP Potion
-};
-
-new const g_ItemName[][] =
-{
-	"Gol",
-	"Luna Plina",
-	"Tais Barbar",
-	"Nimfa",
-	"Armura Posedata",
-	"Armura Monstruoasa",
-	"Coif de Fier",
-	"Coif Dragon",
-	"Scut Chinezesc",
-	"Scut Titan",
-	"Papuci de Vant",
-	"Papuci Spirit",
-	"Cercei de Abanos",
-	"Bratara Lunara",
-	"Lichior HP",
-	"Lichior MP"
-};
-
-#define TOTAL_ITEMS 16
-#define ITEM_WEAPON  1
-#define ITEM_ARMOR   2
-#define ITEM_HELMET  3
-#define ITEM_SHIELD  4
-#define ITEM_SHOES   5
-#define ITEM_JEWEL   6
-#define ITEM_POTION  7
 
 // ======================== FORWARDS & NATIVES ========================
 new g_fwd_SkillUsed;
@@ -207,7 +172,6 @@ public plugin_init()
 	register_clcmd("say /binds",    "cmd_binds");
 	register_clcmd("say /reset",    "cmd_reset");
 
-	
 	register_clcmd("skill1", "cmd_skill1");
 	register_clcmd("skill2", "cmd_skill2");
 	register_clcmd("skill3", "cmd_skill3");
@@ -253,6 +217,9 @@ public plugin_init()
 	g_fwd_StatAllocated  = CreateMultiForward("m2_stat_allocated", ET_IGNORE, FP_CELL, FP_CELL); // id, stat_type (1=STR,2=HP,3=DEX,4=INT)
 	g_fwd_SkillLearned   = CreateMultiForward("m2_skill_learned", ET_IGNORE, FP_CELL, FP_CELL, FP_CELL); // id, skill_idx, new_level
 	
+	// Inregistreaza itemele default (ID-uri 0-15 pastrate pentru compatibilitate salvari)
+	RegisterDefaultItems();
+	
 	set_task(1.0, "Task_HUD", _, _, _, "b");
 	set_task(2.0, "Task_ManaRegen", _, _, _, "b");
 }
@@ -274,41 +241,109 @@ public plugin_end()
 	DestroyForward(g_fwd_SkillLearned);
 }
 
+// ======================== ITEM SYSTEM (DYNAMIC) ========================
+
+stock RegisterDefaultItems()
+{
+	// ID 0 = Gol (obligatoriu)
+	RegisterItemInternal("Gol",              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+	// Weapons
+	RegisterItemInternal("Luna Plina",       ITEM_WEAPON, 1, 0, 5, 0, 2, 0, 3, 0, 15000, 0);
+	RegisterItemInternal("Tais Barbar",      ITEM_WEAPON, 1, 0, 8, 0, 0, 0, 5, 0, 22000, 0);
+	RegisterItemInternal("Nimfa",            ITEM_WEAPON, 1, 0, 3, 0, 4, 2, 2, 0, 18000, 0);
+
+	// Armor
+	RegisterItemInternal("Armura Posedata",  ITEM_ARMOR,  1, 0, 0,15, 0, 0, 0, 0, 12000, 0);
+	RegisterItemInternal("Armura Monstruoasa",ITEM_ARMOR,1, 0, 2,25, 0, 0, 0, 0, 20000, 0);
+
+	// Helmet
+	RegisterItemInternal("Coif de Fier",     ITEM_HELMET, 1, 0, 1, 5, 1, 0, 0, 0,  8000, 0);
+	RegisterItemInternal("Coif Dragon",      ITEM_HELMET, 1, 0, 3,10, 2, 0, 1, 0, 15000, 0);
+
+	// Shield
+	RegisterItemInternal("Scut Chinezesc",   ITEM_SHIELD, 1, 0, 0, 8, 0, 0, 0, 0,  9000, 0);
+	RegisterItemInternal("Scut Titan",       ITEM_SHIELD, 1, 0, 2,15, 0, 0, 0, 0, 16000, 0);
+
+	// Shoes
+	RegisterItemInternal("Papuci de Vant",   ITEM_SHOES,  1, 0, 0, 0, 5, 0, 0,15, 11000, 0);
+	RegisterItemInternal("Papuci Spirit",    ITEM_SHOES,  1, 0, 0, 0, 3, 2, 0,20, 14000, 0);
+
+	// Jewel
+	RegisterItemInternal("Cercei de Abanos", ITEM_JEWEL,  1, 0, 0, 0, 0, 4, 4, 0, 13000, 0);
+	RegisterItemInternal("Bratara Lunara",   ITEM_JEWEL,  1, 0, 2, 5, 2, 2, 2, 0, 17000, 0);
+
+	// Potions
+	RegisterItemInternal("Lichior HP",       ITEM_POTION, 1, 0, 0, 0, 0, 0, 0, 0,   800, 1);
+	RegisterItemInternal("Lichior MP",       ITEM_POTION, 1, 0, 0, 0, 0, 0, 0, 0,   900, 2);
+}
+
+stock RegisterItemInternal(const name[], type, req_level, race_req, str, hp, dex, intt, crit, speed, price, potion_type)
+{
+	if (g_ItemCount >= MAX_ITEMS)
+		return -1;
+
+	new item_id = g_ItemCount;
+
+	copy(g_Items[item_id][ItemName], charsmax(g_Items[][ItemName]), name);
+	g_Items[item_id][ItemType]       = type;
+	g_Items[item_id][ItemReqLevel]   = req_level;
+	g_Items[item_id][ItemRaceReq]    = race_req;
+	g_Items[item_id][ItemStr]        = str;
+	g_Items[item_id][ItemHp]         = hp;
+	g_Items[item_id][ItemDex]        = dex;
+	g_Items[item_id][ItemInt]        = intt;
+	g_Items[item_id][ItemCrit]       = crit;
+	g_Items[item_id][ItemSpeed]      = speed;
+	g_Items[item_id][ItemPrice]      = price;
+	g_Items[item_id][ItemPotionType] = potion_type;
+
+	g_ItemCount++;
+	return item_id;
+}
+
 // ======================== NATIVES ========================
 public _m2_register_item(plugin, params)
 {
-	// Verificăm dacă am atins limita maximă de iteme
 	if (g_ItemCount >= MAX_ITEMS)
 	{
 		log_amx("[Metin2] Nu se mai pot inregistra iteme! Limita de %d a fost atinsa.", MAX_ITEMS);
 		return -1;
 	}
 
-	// Preluăm numele (string)
 	new szName[32];
 	get_string(1, szName, charsmax(szName));
-	
-	// Preluăm restul parametrilor
-	new slot       = get_param(2);
-	new req_level  = get_param(3);
-	new bonus_type = get_param(4);
-	new base_val   = get_param(5);
-	new race_req   = get_param(6);
 
-	// Stocăm datele în array
+	new type        = get_param(2);
+	new req_level   = get_param(3);
+	new race_req    = get_param(4);
+	new str         = get_param(5);
+	new hp          = get_param(6);
+	new dex         = get_param(7);
+	new intt        = get_param(8);
+	new crit        = get_param(9);
+	new speed       = get_param(10);
+	new price       = get_param(11);
+	new potion_type = get_param(12);
+
 	new item_id = g_ItemCount;
-	
-	copy(g_Items[item_id][ItemName], charsmax(g_Items[][ItemName]), szName);
-	g_Items[item_id][ItemSlot]      = slot;
-	g_Items[item_id][ItemReqLevel]  = req_level;
-	g_Items[item_id][ItemBonusType] = bonus_type;
-	g_Items[item_id][ItemBaseVal]   = base_val;
-	g_Items[item_id][ItemRaceReq]   = race_req;
 
-	// Incrementăm contorul global
+	copy(g_Items[item_id][ItemName], charsmax(g_Items[][ItemName]), szName);
+	g_Items[item_id][ItemType]       = type;
+	g_Items[item_id][ItemReqLevel]   = req_level;
+	g_Items[item_id][ItemRaceReq]    = race_req;
+	g_Items[item_id][ItemStr]        = str;
+	g_Items[item_id][ItemHp]         = hp;
+	g_Items[item_id][ItemDex]        = dex;
+	g_Items[item_id][ItemInt]        = intt;
+	g_Items[item_id][ItemCrit]       = crit;
+	g_Items[item_id][ItemSpeed]      = speed;
+	g_Items[item_id][ItemPrice]      = price;
+	g_Items[item_id][ItemPotionType] = potion_type;
+
 	g_ItemCount++;
 
-	// Returnăm ID-ul noului item (0, 1, 2...)
+	log_amx("[Metin2] Item inregistrat: '%s' (ID %d, Type %d, Price %d)", szName, item_id, type, price);
 	return item_id;
 }
 
@@ -443,7 +478,7 @@ public client_putinserver(id)
 	reset_player(id);
 	load_player(id);
 	
-	set_task(3.0, "Task_WelcomeMsg", id);	// 1.5 secunde e suficient
+	set_task(3.0, "Task_WelcomeMsg", id);
 }
 
 public Task_WelcomeMsg(id)
@@ -529,7 +564,7 @@ stock load_player(id)
 	if (size <= 0)
 	{
 		g_Player[id][g_Level] = 1;
-		g_Player[id][g_Yang] = 5000;
+		g_Player[id][g_Yang] = 1000;
 		g_Player[id][g_MP] = 50;
 		g_Player[id][g_MaxMP] = 50;
 	}
@@ -559,8 +594,8 @@ stock recalc_max_mp(id)
 	for (new i = 0; i < MAX_EQUIP_SLOTS; i++)
 	{
 		new itemid = g_Player[id][g_Equipped][i];
-		if (itemid > 0 && itemid < TOTAL_ITEMS)
-			maxmp += g_ItemData[itemid][5] * 3 + g_Player[id][g_EquippedUpgrade][i] * 2;
+		if (itemid > 0 && itemid < g_ItemCount)
+			maxmp += g_Items[itemid][ItemInt] * 3 + g_Player[id][g_EquippedUpgrade][i] * 2;
 	}
 	
 	g_Player[id][g_MaxMP] = maxmp;
@@ -669,10 +704,10 @@ public OnPlayerSpawn(id)
 	for (new i = 0; i < MAX_EQUIP_SLOTS; i++)
 	{
 		new itemid = g_Player[id][g_Equipped][i];
-		if (itemid > 0 && itemid < TOTAL_ITEMS)
+		if (itemid > 0 && itemid < g_ItemCount)
 		{
 			new upg = g_Player[id][g_EquippedUpgrade][i];
-			hp += g_ItemData[itemid][3] + (upg * 3);
+			hp += g_Items[itemid][ItemHp] + (upg * 3);
 		}
 	}
 	
@@ -682,8 +717,8 @@ public OnPlayerSpawn(id)
 	for (new i = 0; i < MAX_EQUIP_SLOTS; i++)
 	{
 		new itemid = g_Player[id][g_Equipped][i];
-		if (itemid > 0 && itemid < TOTAL_ITEMS)
-			speed += float(g_ItemData[itemid][7] + g_Player[id][g_EquippedUpgrade][i] * 2);
+		if (itemid > 0 && itemid < g_ItemCount)
+			speed += float(g_Items[itemid][ItemSpeed] + g_Player[id][g_EquippedUpgrade][i] * 2);
 	}
 	
 	set_user_maxspeed(id, speed);
@@ -702,8 +737,8 @@ public OnTakeDamage(victim, inflictor, attacker, Float:damage, damagebits)
 	new weap_id = g_Player[attacker][g_Equipped][SLOT_WEAPON];
 	new weap_upg = g_Player[attacker][g_EquippedUpgrade][SLOT_WEAPON];
 	new Float:weap_bonus = 0.0;
-	if (weap_id > 0 && weap_id < TOTAL_ITEMS)
-		weap_bonus = float(g_ItemData[weap_id][2] * 2 + weap_upg * 4);
+	if (weap_id > 0 && weap_id < g_ItemCount)
+		weap_bonus = float(g_Items[weap_id][ItemStr] * 2 + weap_upg * 4);
 	
 	// Aura Sabiei / Tais Vrajit / Atac Intens
 	if (g_AuraActive[attacker])
@@ -720,8 +755,8 @@ public OnTakeDamage(victim, inflictor, attacker, Float:damage, damagebits)
 	// Armor Pierce - reduce defense
 	new Float:def = float(g_Player[victim][g_DEX]) * 0.8;
 	new armor_id = g_Player[victim][g_Equipped][SLOT_ARMOR];
-	if (armor_id > 0 && armor_id < TOTAL_ITEMS)
-		def += float(g_ItemData[armor_id][3] + g_Player[victim][g_EquippedUpgrade][SLOT_ARMOR] * 3);
+	if (armor_id > 0 && armor_id < g_ItemCount)
+		def += float(g_Items[armor_id][ItemHp] + g_Player[victim][g_EquippedUpgrade][SLOT_ARMOR] * 3);
 	
 	if (g_PierceActive[attacker])
 	{
@@ -890,7 +925,7 @@ stock skill_warrior(id, slot, lvl)
 		case 1: // Corp Rezistent - real damage reduction
 		{
 			g_ResistActive[id] = true;
-			g_ResistAmount[id] = 0.25 + (float(lvl) * 0.008) + (float(g_Player[id][g_HP]) * 0.002); // 25% + bonus
+			g_ResistAmount[id] = 0.25 + (float(lvl) * 0.008) + (float(g_Player[id][g_HP]) * 0.002);
 			if (g_ResistAmount[id] > 0.55) g_ResistAmount[id] = 0.55;
 			
 			new Float:dur = 7.0 + (lvl * 0.2);
@@ -922,10 +957,10 @@ stock skill_warrior(id, slot, lvl)
 			pev(id, pev_v_angle, angles);
 			angle_vector(angles, ANGLEVECTOR_FORWARD, vec);
 	
-			new Float:speed = 900.0 + (lvl * 15.0);		// poți regla
+			new Float:speed = 900.0 + (lvl * 15.0);
 			vec[0] *= speed;
 			vec[1] *= speed;
-			vec[2] = 150.0;		// puțină înălțime ca să nu se blocheze pe trepte
+			vec[2] = 150.0;
 	
 			set_pev(id, pev_velocity, vec);
 	
@@ -1002,7 +1037,7 @@ stock skill_sura(id, slot, lvl)
 		case 2: // Armor Pierce - real pierce
 		{
 			g_PierceActive[id] = true;
-			g_PierceAmount[id] = 0.35 + (float(lvl) * 0.01) + (float(g_Player[id][g_INT]) * 0.005); // 35%+
+			g_PierceAmount[id] = 0.35 + (float(lvl) * 0.01) + (float(g_Player[id][g_INT]) * 0.005);
 			if (g_PierceAmount[id] > 0.70) g_PierceAmount[id] = 0.70;
 			
 			new Float:dur = 6.0 + (lvl * 0.15);
@@ -1097,7 +1132,6 @@ public cmd_reset(id)
 	g_Player[id][g_INT] = 1;
 	
 	// Puncte totale ca la un caracter nou de acelasi level
-	// (5 stat + 3 skill la alegerea rasei) + 1 punct pe fiecare level dupa 1
 	g_Player[id][g_StatPoints]  = 5 + (level - 1);
 	g_Player[id][g_SkillPoints] = 3 + (level - 1);
 	
@@ -1121,7 +1155,7 @@ public cmd_reset(id)
 	
 	recalc_max_mp(id);
 	
-	save_player(id);		// salveaza imediat
+	save_player(id);
 	
 	client_print_color(id, print_team_default, "^4[Metin2]^1 Caracter resetat! Level: ^3%d^1 | Stat Points: ^3%d^1 | Skill Points: ^3%d", level, g_Player[id][g_StatPoints], g_Player[id][g_SkillPoints]);
 	client_print_color(id, print_team_default, "^4[Metin2]^1 Alege noua rasa cu ^3/menu^1.");
@@ -1219,7 +1253,8 @@ stock skill_shaman(id, slot, lvl)
 			for (new i = 0; i < MAX_EQUIP_SLOTS; i++)
 			{
 				new itemid = g_Player[id][g_Equipped][i];
-				if (itemid > 0) maxhp += g_ItemData[itemid][3] + g_Player[id][g_EquippedUpgrade][i] * 3;
+				if (itemid > 0 && itemid < g_ItemCount)
+					maxhp += g_Items[itemid][ItemHp] + g_Player[id][g_EquippedUpgrade][i] * 3;
 			}
 			
 			set_user_health(id, min(hp + heal, maxhp));
@@ -1319,8 +1354,8 @@ public RestoreSpeed(id)
 		for (new i = 0; i < MAX_EQUIP_SLOTS; i++)
 		{
 			new itemid = g_Player[id][g_Equipped][i];
-			if (itemid > 0 && itemid < TOTAL_ITEMS)
-				speed += float(g_ItemData[itemid][7] + g_Player[id][g_EquippedUpgrade][i] * 2);
+			if (itemid > 0 && itemid < g_ItemCount)
+				speed += float(g_Items[itemid][ItemSpeed] + g_Player[id][g_EquippedUpgrade][i] * 2);
 		}
 		set_user_maxspeed(id, speed);
 	}
@@ -1787,10 +1822,10 @@ public inv_handler(id, menu, item)
 stock get_item_name(itemid)
 {
 	static name[32];
-	if (itemid <= 0 || itemid >= TOTAL_ITEMS)
+	if (itemid <= 0 || itemid >= g_ItemCount)
 		formatex(name, charsmax(name), "Gol");
 	else
-		copy(name, charsmax(name), g_ItemName[itemid]);
+		copy(name, charsmax(name), g_Items[itemid][ItemName]);
 	return name;
 }
 
@@ -1801,10 +1836,10 @@ stock show_equip_from_inv(id)
 	for (new i = 0; i < g_Player[id][g_InventoryCount]; i++)
 	{
 		new iid = g_Player[id][g_Inventory][i];
-		if (iid > 0 && g_ItemData[iid][1] != ITEM_POTION)
+		if (iid > 0 && iid < g_ItemCount && g_Items[iid][ItemType] != ITEM_POTION)
 		{
 			new tmp[48];
-			formatex(tmp, charsmax(tmp), "%s +%d", g_ItemName[iid], g_Player[id][g_InventoryUpgrade][i]);
+			formatex(tmp, charsmax(tmp), "%s +%d", g_Items[iid][ItemName], g_Player[id][g_InventoryUpgrade][i]);
 			new info[8];
 			formatex(info, charsmax(info), "%d", i);
 			menu_additem(menu, tmp, info);
@@ -1828,7 +1863,14 @@ public equip_handler(id, menu, item)
 	
 	new itemid = g_Player[id][g_Inventory][inv_slot];
 	new upg = g_Player[id][g_InventoryUpgrade][inv_slot];
-	new type = g_ItemData[itemid][1];
+	
+	if (itemid <= 0 || itemid >= g_ItemCount)
+	{
+		menu_destroy(menu);
+		return PLUGIN_HANDLED;
+	}
+	
+	new type = g_Items[itemid][ItemType];
 	
 	new equip_slot = -1;
 	if (type == ITEM_WEAPON) equip_slot = SLOT_WEAPON;
@@ -1858,7 +1900,7 @@ public equip_handler(id, menu, item)
 	g_Player[id][g_InventoryCount]--;
 	
 	recalc_max_mp(id);
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai echipat ^3%s +%d", g_ItemName[itemid], upg);
+	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai echipat ^3%s +%d", g_Items[itemid][ItemName], upg);
 	save_player(id);
 	
 	// Forward
@@ -1936,10 +1978,10 @@ stock use_potion_menu(id)
 	for (new i = 0; i < g_Player[id][g_InventoryCount]; i++)
 	{
 		new iid = g_Player[id][g_Inventory][i];
-		if (iid == 14 || iid == 15)
+		if (iid > 0 && iid < g_ItemCount && g_Items[iid][ItemType] == ITEM_POTION)
 		{
 			new tmp[32];
-			formatex(tmp, charsmax(tmp), "%s", g_ItemName[iid]);
+			formatex(tmp, charsmax(tmp), "%s", g_Items[iid][ItemName]);
 			new info[8];
 			formatex(info, charsmax(info), "%d", i);
 			menu_additem(menu, tmp, info);
@@ -1963,16 +2005,28 @@ public potion_handler(id, menu, item)
 	
 	new itemid = g_Player[id][g_Inventory][inv_slot];
 	
-	if (itemid == 14) // HP
+	if (itemid <= 0 || itemid >= g_ItemCount || g_Items[itemid][ItemType] != ITEM_POTION)
+	{
+		menu_destroy(menu);
+		return PLUGIN_HANDLED;
+	}
+	
+	if (g_Items[itemid][ItemPotionType] == 1) // HP
 	{
 		new hp = get_user_health(id);
 		set_user_health(id, min(hp + 80, 100 + g_Player[id][g_HP] * 10 + 50));
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Ai folosit Lichior HP!");
 	}
-	else if (itemid == 15) // MP
+	else if (g_Items[itemid][ItemPotionType] == 2) // MP
 	{
 		g_Player[id][g_MP] = min(g_Player[id][g_MP] + 60, g_Player[id][g_MaxMP]);
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Ai folosit Lichior MP!");
+	}
+	else
+	{
+		client_print_color(id, print_team_default, "^4[Metin2]^1 Acest item nu este o potiune valida.");
+		menu_destroy(menu);
+		return PLUGIN_HANDLED;
 	}
 	
 	// Scoate din inventar
@@ -1998,13 +2052,13 @@ public cmd_upgrade(id)
 	for (new i = 0; i < g_Player[id][g_InventoryCount]; i++)
 	{
 		new iid = g_Player[id][g_Inventory][i];
-		if (iid > 0 && g_ItemData[iid][1] != ITEM_POTION)
+		if (iid > 0 && iid < g_ItemCount && g_Items[iid][ItemType] != ITEM_POTION)
 		{
 			new upg = g_Player[id][g_InventoryUpgrade][i];
 			if (upg < MAX_UPGRADE)
 			{
 				new tmp[48];
-				formatex(tmp, charsmax(tmp), "%s +%d -> +%d", g_ItemName[iid], upg, upg + 1);
+				formatex(tmp, charsmax(tmp), "%s +%d -> +%d", g_Items[iid][ItemName], upg, upg + 1);
 				new info[8];
 				formatex(info, charsmax(info), "%d", i);
 				menu_additem(menu, tmp, info);
@@ -2068,7 +2122,6 @@ public upgrade_menu_handler(id, menu, item)
 				g_Player[id][g_InventoryUpgrade][i] = g_Player[id][g_InventoryUpgrade][i + 1];
 			}
 
-			// Curățăm ultimul slot și scădem contorul doar dacă itemul a fost distrus
 			g_Player[id][g_Inventory][g_Player[id][g_InventoryCount] - 1] = 0;
 			g_Player[id][g_InventoryUpgrade][g_Player[id][g_InventoryCount] - 1] = 0;
 			g_Player[id][g_InventoryCount]--;
@@ -2098,10 +2151,13 @@ public cmd_shop(id)
 	formatex(title, charsmax(title), "\yMagazin - Yang: %d", g_Player[id][g_Yang]);
 	new menu = menu_create(title, "shop_handler");
 	
-	for (new i = 1; i < TOTAL_ITEMS; i++)
+	for (new i = 1; i < g_ItemCount; i++)
 	{
+		if (g_Items[i][ItemPrice] <= 0)
+			continue;
+		
 		new tmp[48];
-		formatex(tmp, charsmax(tmp), "%s - %d Yang", g_ItemName[i], g_ItemData[i][8]);
+		formatex(tmp, charsmax(tmp), "%s - %d Yang", g_Items[i][ItemName], g_Items[i][ItemPrice]);
 		new info[8];
 		formatex(info, charsmax(info), "%d", i);
 		menu_additem(menu, tmp, info);
@@ -2123,6 +2179,12 @@ public shop_handler(id, menu, item)
 	menu_item_getinfo(menu, item, _, data, charsmax(data), _, _, _);
 	new itemid = str_to_num(data);
 	
+	if (itemid <= 0 || itemid >= g_ItemCount)
+	{
+		menu_destroy(menu);
+		return PLUGIN_HANDLED;
+	}
+	
 	if (g_Player[id][g_InventoryCount] >= MAX_INVENTORY)
 	{
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Inventar plin!");
@@ -2130,7 +2192,7 @@ public shop_handler(id, menu, item)
 		return PLUGIN_HANDLED;
 	}
 	
-	new price = g_ItemData[itemid][8];
+	new price = g_Items[itemid][ItemPrice];
 	if (g_Player[id][g_Yang] < price)
 	{
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Yang insuficient!");
@@ -2145,7 +2207,7 @@ public shop_handler(id, menu, item)
 	g_Player[id][g_InventoryUpgrade][idx] = 0;
 	g_Player[id][g_InventoryCount]++;
 	
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai cumparat ^3%s", g_ItemName[itemid]);
+	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai cumparat ^3%s", g_Items[itemid][ItemName]);
 	save_player(id);
 	
 	menu_destroy(menu);
