@@ -43,6 +43,20 @@
 // ======================== NATIVES ========================
 
 /**
+ * Inregistreaza un item nou in baza de date a jocului
+ *
+ * @param name          Numele itemului (ex: "Sabie Solara")
+ * @param slot          Slotul de echipament (M2_SLOT_WEAPON, M2_SLOT_ARMOR etc.)
+ * @param req_level     Nivelul minim necesar
+ * @param bonus_type    Tipul de bonus (1 = Atac, 2 = Apărare, 3 = HP, 4 = MP)
+ * @param base_val      Valoarea bonusului la +0
+ * @param race_req      Rasa necesară (M2_RACE_NONE pentru toate)
+ *
+ * @return              ID-ul noului item generat (sau -1 la esec)
+ */
+native m2_register_item(const name[], slot, req_level, bonus_type, base_val, race_req = M2_RACE_NONE);
+
+/**
  * Returneaza level-ul jucatorului
  *
  * @param id        Indexul jucatorului
