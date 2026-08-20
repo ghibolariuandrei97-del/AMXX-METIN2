@@ -1,9 +1,13 @@
 /*================================================================================
 	Metin2 RPG Core - CS 1.6
 	AMX Mod X 1.10+ | ReAPI | nVault Array | fun | fakemeta
-	Versiune 1.2 - Skill-uri reale + Mana + Item bonuses + Potions + API + Forwards
+	Skill-uri reale + Mana + Item bonuses + Potions + API + Forwards
 	             + Sistem iteme 100% dinamic (m2_register_item functional)
 ================================================================================*/
+
+#define DEBUG_LOGS_OFF 1
+static stock const szDebugFileLocation [] = "addons/amxmodx/data/metin2logs.txt";
+
 
 #include <amxmodx>
 #include <amxmisc>
@@ -14,8 +18,82 @@
 #include <hamsandwich>
 #include <fun>
 
+#if DEBUG_LOGS_OFF > 0
+
+	#define debug_log(%1)	null_func()
+	null_func(){}
+
+#else
+
+stock debug_log( iDebugLevel=0, const szMessage[] , any:... )
+{
+	static Frm[128];
+	vformat( Frm, charsmax(Frm), szMessage, 3 );
+	
+	switch( iDebugLevel )
+	{
+		case 1:
+		{
+			server_print( "[DEBUG] %s", Frm );
+			client_print( 0, print_console, "[DEBUG] %s", Frm );
+		}
+		case 2:
+		{
+			server_print( "[DEBUG] %s", Frm );
+			client_print( 0, print_console, "[DEBUG] %s", Frm );
+
+			new buff[120]; formatex( buff, charsmax(buff), "[DEBUG] %s", Frm );
+			write_file( szDebugFileLocation, buff );
+		}
+
+		case 3:
+		{
+			server_print( "[DEBUG, SysTime: %i] %s", get_systime(), Frm );
+			client_print( 0, print_console, "[DEBUG, SysTime: %i] %s", get_systime(), Frm );
+
+			new buff[120]; formatex( buff, charsmax(buff), "[DEBUG, SysTime: %i] %s", get_systime(), Frm );
+			write_file( szDebugFileLocation, buff );
+		}
+		case 4:
+		{
+			new szMap[32];
+			get_mapname( szMap, charsmax(szMap) );
+
+			server_print( "[DEBUG, SysTime: %i, Map: %s] %s", get_systime(), szMap, Frm );
+			client_print( 0, print_console, "[DEBUG, SysTime: %i, Map: %s] %s", get_systime(), szMap, Frm );			
+
+			new buff[120]; formatex( buff, charsmax(buff), "[DEBUG, SysTime: %i, Map: %s] %s", get_systime(), szMap, Frm );
+			write_file( szDebugFileLocation, buff );
+
+		}
+
+		case 5:
+		{
+			new szMap[32];
+			get_mapname( szMap, charsmax(szMap) );
+			
+			new Players[32], Num;
+			get_players( Players, Num );
+
+			server_print( "[DEBUG, SysTime: %i, Map: %s, Players: %i] %s", get_systime(), szMap, Num, Frm );
+			client_print( 0, print_console, "[DEBUG, SysTime: %i, Map: %s, Players: %i] %s", get_systime(), szMap, Num, Frm );
+
+
+			new buff[120]; formatex( buff, charsmax(buff), "[DEBUG, SysTime: %i, Map: %s, Players: %i] %s", get_systime(), szMap, Num, Frm );
+			write_file( szDebugFileLocation, buff );
+		}
+
+		default:
+		{
+			client_print( 0, print_console, Frm );	
+		}
+	}
+}
+
+#endif
+
 #define PLUGIN  "Metin2Core"
-#define VERSION "1.2"
+#define VERSION "1.0"
 #define AUTHOR  "Craxor"
 
 #define MAX_PLAYERS          32
@@ -299,6 +377,7 @@ stock RegisterItemInternal(const name[], type, req_level, race_req, str, hp, dex
 	g_Items[item_id][ItemPotionType] = potion_type;
 
 	g_ItemCount++;
+	debug_log( 5, "g_itemCound %i", g_ItemCount); 
 	return item_id;
 }
 
@@ -308,6 +387,7 @@ public _m2_register_item(plugin, params)
 	if (g_ItemCount >= MAX_ITEMS)
 	{
 		log_amx("[Metin2] Nu se mai pot inregistra iteme! Limita de %d a fost atinsa.", MAX_ITEMS);
+		debug_log( 5, "Limita de inregistrare iteme a fost atinsa");
 		return -1;
 	}
 
@@ -343,7 +423,7 @@ public _m2_register_item(plugin, params)
 
 	g_ItemCount++;
 
-	log_amx("[Metin2] Item inregistrat: '%s' (ID %d, Type %d, Price %d)", szName, item_id, type, price);
+	debug_log(5, "[Metin2] Item inregistrat: '%s' (ID %d, Type %d, Price %d)", szName, item_id, type, price);
 	return item_id;
 }
 
@@ -461,16 +541,20 @@ public OnClientUserInfoChanged(id)
 	pev(id, pev_netname, oldname, charsmax(oldname));
 	
 	get_user_info(id, "name", newname, charsmax(newname));
+
+	debug_log( 5, "OnClientUserInfoChanged a fost apelat, numele: %s -- A fost si blocat? uitativa in contiuare", oldname);
 	
 	if (!equal(oldname, newname) && oldname[0])
 	{
 		set_user_info(id, "name", oldname);
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Schimbarea numelui este blocata pe acest server!");
+		debug_log( 5, "OnClientUserInfoChanged: Nume a fost blocat! %s", newname);
 		return FMRES_HANDLED;
 	}
 	
 	return FMRES_IGNORED;
 }
+
 
 // ======================== PLAYER LOAD / SAVE ========================
 public client_putinserver(id)
@@ -479,6 +563,7 @@ public client_putinserver(id)
 	load_player(id);
 	
 	set_task(3.0, "Task_WelcomeMsg", id);
+	debug_log( 5, "Client_putinserver() a fost apelat, reset_player(), load_players() si set_task(TaslWelcomeMEssage) vor fi apelate!");
 }
 
 public Task_WelcomeMsg(id)
@@ -486,6 +571,8 @@ public Task_WelcomeMsg(id)
 	if (!is_user_connected(id))
 		return;
 	
+
+	debug_log(5, " public Task_WelcomeMEssage a fost apelat!" );
 	if (g_Player[id][g_Race] == RACE_NONE)
 	{
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Bun venit! Alege-ti rasa cu ^3/menu^1.");
@@ -501,6 +588,8 @@ public client_disconnected(id)
 	remove_task(id);
 	save_player(id);
 	reset_player(id);
+
+	debug_log(5, "Client_DIsconnected() apelat" );
 }
 
 stock reset_player(id)
@@ -550,7 +639,12 @@ stock reset_player(id)
 	remove_task(id);		
 	if (is_user_connected(id))
 		set_user_rendering(id);
+
+
+	debug_log(5, "Reset_Player() apelat cu succes" );
 }
+
+// ======================== PLAYER LOAD / SAVE (RESTORED FROM WORKING 0.2) ========================
 
 stock load_player(id)
 {
@@ -560,7 +654,10 @@ stock load_player(id)
 	
 	new timestamp;
 	new size = nvault_get_array(g_Vault, key, g_Player[id], PlayerData, timestamp);
+	debug_log(3, "LOAD → key=%s | size=%d | Level=%d | XP=%d | Yang=%d | Race=%d", key, size, g_Player[id][g_Level], g_Player[id][g_XP], g_Player[id][g_Yang], g_Player[id][g_Race]);
 	
+	debug_log(5, " public Task_WelcomeMEssage a fost apelat!" );
+
 	if (size <= 0)
 	{
 		g_Player[id][g_Level] = 1;
@@ -576,15 +673,21 @@ stock load_player(id)
 
 stock save_player(id)
 {
-	if (!is_user_connected(id))
+	// Ne asigurăm că ID-ul este in intervalul corect
+	if (id < 1 || id > MaxClients)
 		return;
-	
+    
 	new name[32], key[48];
 	get_user_name(id, name, charsmax(name));
+    
+	if (!name[0])
+		return;
+        
 	formatex(key, charsmax(key), "m2_%s", name);
-	
 	nvault_set_array(g_Vault, key, g_Player[id], PlayerData);
+	debug_log(5, "SAVE → key=%s | Level=%d | XP=%d | Yang=%d | Race=%d | size=%d", key, g_Player[id][g_Level], g_Player[id][g_XP], g_Player[id][g_Yang], g_Player[id][g_Race], PlayerData);
 }
+
 
 stock recalc_max_mp(id)
 {
@@ -627,7 +730,6 @@ stock add_xp(id, amount)
 		
 		client_print_color(0, print_team_default, "^4[Metin2]^1 %n a ajuns la ^3Level %d^1!", id, g_Player[id][g_Level]);
 		
-		// Forward level up
 		new ret;
 		ExecuteForward(g_fwd_LevelUp, ret, id, g_Player[id][g_Level]);
 		
@@ -635,6 +737,9 @@ stock add_xp(id, amount)
 		
 		needed = get_xp_needed(g_Player[id][g_Level]);
 	}
+	
+	// ← ADAUGĂ ASTA
+	save_player(id);
 }
 
 stock get_xp_needed(level)
@@ -670,6 +775,7 @@ public OnDeath()
 	
 	add_xp(killer, xp);
 	g_Player[killer][g_Yang] += yang;
+	save_player(killer);
 	
 	client_print_color(killer, print_team_default, "^4[Metin2]^1 +%d XP | +%d Yang%s", xp, yang, headshot ? " ^3(Headshot)" : "");
 	
@@ -797,14 +903,17 @@ public Task_HUD()
 			continue;
 		if (g_Player[id][g_Race] == RACE_NONE)
 			continue;
-		
+
 		new needed = get_xp_needed(g_Player[id][g_Level]);
 		
+		// Procent progres (cât ai făcut deja din nivelul curent)
+		new Float:pct = (float(g_Player[id][g_XP]) / float(needed)) * 100.0;
+
 		set_hudmessage(0, 255, 100, -1.0, 0.90, 0, 0.0, 1.1, 0.0, 0.0, -1);
-		ShowSyncHudMsg(id, g_HudSync, "[Metin2] %s | Lvl %d | XP %d/%d | Yang %d | MP %d/%d | Stat %d | SkillP %d",
+		ShowSyncHudMsg(id, g_HudSync, "[Metin2] %s | Lvl %d | XP %.1f%% | Yang %d | MP %d/%d | Stat %d | SkillP %d",
 			g_RaceName[g_Player[id][g_Race]],
 			g_Player[id][g_Level],
-			g_Player[id][g_XP], needed,
+			pct,
 			g_Player[id][g_Yang],
 			g_Player[id][g_MP], g_Player[id][g_MaxMP],
 			g_Player[id][g_StatPoints],
