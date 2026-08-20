@@ -26,6 +26,15 @@
 #define M2_RACE_NINJA     3
 #define M2_RACE_SHAMAN    4
 
+// ======================== TIPURI ITEME ========================
+#define ITEM_WEAPON          1
+#define ITEM_ARMOR           2
+#define ITEM_HELMET          3
+#define ITEM_SHIELD          4
+#define ITEM_SHOES           5
+#define ITEM_JEWEL           6
+#define ITEM_POTION          7
+
 // ======================== SLOTURI ECHIPAMENT ========================
 #define M2_SLOT_WEAPON    0
 #define M2_SLOT_ARMOR     1
