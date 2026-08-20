@@ -17,7 +17,7 @@
 #include <fun>
 
 // 1=Debug Oprit , 0=Debug Pornit
-#define DEBUG_LOGS_OFF 0
+#define DEBUG_LOGS_OFF 1
 null_func(){}
 
 static stock const szDebugFileLocation[] = "addons/amxmodx/data/metin2logs.txt";
