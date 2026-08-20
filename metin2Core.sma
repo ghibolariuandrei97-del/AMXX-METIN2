@@ -5,8 +5,6 @@
 	             + Sistem iteme 100% dinamic (m2_register_item functional)
 ================================================================================*/
 
-#define DEBUG_LOGS_OFF 1
-static stock const szDebugFileLocation [] = "addons/amxmodx/data/metin2logs.txt";
 
 
 #include <amxmodx>
@@ -18,78 +16,72 @@ static stock const szDebugFileLocation [] = "addons/amxmodx/data/metin2logs.txt"
 #include <hamsandwich>
 #include <fun>
 
-#if DEBUG_LOGS_OFF > 0
+// 1=Debug Oprit , 0=Debug Pornit
+#define DEBUG_LOGS_OFF 0
+null_func(){}
 
+static stock const szDebugFileLocation[] = "addons/amxmodx/data/metin2logs.txt";
+
+#if DEBUG_LOGS_OFF
 	#define debug_log(%1)	null_func()
-	null_func(){}
-
 #else
-
-stock debug_log( iDebugLevel=0, const szMessage[] , any:... )
+stock debug_log(iDebugLevel = 0, const szMessage[], any:...)
 {
 	static Frm[128];
-	vformat( Frm, charsmax(Frm), szMessage, 3 );
-	
-	switch( iDebugLevel )
+	vformat(Frm, charsmax(Frm), szMessage, 3);
+
+	switch (iDebugLevel)
 	{
 		case 1:
 		{
-			server_print( "[DEBUG] %s", Frm );
-			client_print( 0, print_console, "[DEBUG] %s", Frm );
+			server_print("[DEBUG] %s", Frm);
+			client_print(0, print_console, "[DEBUG] %s", Frm);
 		}
 		case 2:
 		{
-			server_print( "[DEBUG] %s", Frm );
-			client_print( 0, print_console, "[DEBUG] %s", Frm );
-
-			new buff[120]; formatex( buff, charsmax(buff), "[DEBUG] %s", Frm );
-			write_file( szDebugFileLocation, buff );
+			server_print("[DEBUG] %s", Frm);
+			client_print(0, print_console, "[DEBUG] %s", Frm);
+			new buff[120];
+			formatex(buff, charsmax(buff), "[DEBUG] %s", Frm);
+			write_file(szDebugFileLocation, buff);
 		}
-
 		case 3:
 		{
-			server_print( "[DEBUG, SysTime: %i] %s", get_systime(), Frm );
-			client_print( 0, print_console, "[DEBUG, SysTime: %i] %s", get_systime(), Frm );
-
-			new buff[120]; formatex( buff, charsmax(buff), "[DEBUG, SysTime: %i] %s", get_systime(), Frm );
-			write_file( szDebugFileLocation, buff );
+			server_print("[DEBUG, SysTime: %i] %s", get_systime(), Frm);
+			client_print(0, print_console, "[DEBUG, SysTime: %i] %s", get_systime(), Frm);
+			new buff[120];
+			formatex(buff, charsmax(buff), "[DEBUG, SysTime: %i] %s", get_systime(), Frm);
+			write_file(szDebugFileLocation, buff);
 		}
 		case 4:
 		{
 			new szMap[32];
-			get_mapname( szMap, charsmax(szMap) );
-
-			server_print( "[DEBUG, SysTime: %i, Map: %s] %s", get_systime(), szMap, Frm );
-			client_print( 0, print_console, "[DEBUG, SysTime: %i, Map: %s] %s", get_systime(), szMap, Frm );			
-
-			new buff[120]; formatex( buff, charsmax(buff), "[DEBUG, SysTime: %i, Map: %s] %s", get_systime(), szMap, Frm );
-			write_file( szDebugFileLocation, buff );
-
+			get_mapname(szMap, charsmax(szMap));
+			server_print("[DEBUG, SysTime: %i, Map: %s] %s", get_systime(), szMap, Frm);
+			client_print(0, print_console, "[DEBUG, SysTime: %i, Map: %s] %s", get_systime(), szMap, Frm);
+			new buff[120];
+			formatex(buff, charsmax(buff), "[DEBUG, SysTime: %i, Map: %s] %s", get_systime(), szMap, Frm);
+			write_file(szDebugFileLocation, buff);
 		}
-
 		case 5:
 		{
 			new szMap[32];
-			get_mapname( szMap, charsmax(szMap) );
-			
+			get_mapname(szMap, charsmax(szMap));
 			new Players[32], Num;
-			get_players( Players, Num );
-
-			server_print( "[DEBUG, SysTime: %i, Map: %s, Players: %i] %s", get_systime(), szMap, Num, Frm );
-			client_print( 0, print_console, "[DEBUG, SysTime: %i, Map: %s, Players: %i] %s", get_systime(), szMap, Num, Frm );
-
-
-			new buff[120]; formatex( buff, charsmax(buff), "[DEBUG, SysTime: %i, Map: %s, Players: %i] %s", get_systime(), szMap, Num, Frm );
-			write_file( szDebugFileLocation, buff );
+			get_players(Players, Num);
+			server_print("[DEBUG, SysTime: %i, Map: %s, Players: %i] %s", get_systime(), szMap, Num, Frm);
+			client_print(0, print_console, "[DEBUG, SysTime: %i, Map: %s, Players: %i] %s", get_systime(), szMap, Num, Frm);
+			new buff[120];
+			formatex(buff, charsmax(buff), "[DEBUG, SysTime: %i, Map: %s, Players: %i] %s", get_systime(), szMap, Num, Frm);
+			write_file(szDebugFileLocation, buff);
 		}
-
 		default:
 		{
-			client_print( 0, print_console, Frm );	
+			client_print(0, print_console, Frm);
+			null_func();
 		}
 	}
 }
-
 #endif
 
 #define PLUGIN  "Metin2Core"
