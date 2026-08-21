@@ -1,6 +1,14 @@
 ================================================================================
                     METIN2 RPG CORE (CS 1.6) - GHID COMPLET & DOCUMENTATIE
 ================================================================================
+[0]
+IMPORTANT , INAINTE DE TOATE!
+--------------------------------------------------------------------------------
+Fisierul metin2Core.amxx odata ce e compilat, trebuie sa fie PRIMUL SCRIS CAT MAI SUS in plugins.ini inainte
+oricarui alt plugin inafara celor amxx default. 
+
+Orice plugin Extern care foloseste metin2 api trebuie sa fie intodeauna sub metin2Core.amxx ! ! !
+--------------------------------------------------------------------------------
 
 [1] DESPRE MOD / DESCRIERE GENERALA
 --------------------------------------------------------------------------------
