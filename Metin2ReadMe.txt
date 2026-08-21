@@ -1,193 +1,270 @@
 ================================================================================
-                    METIN2 RPG CORE (CS 1.6) - GHID COMPLET & DOCUMENTATIE
+          METIN2 RPG CORE (CS 1.6) - GHID COMPLET & DOCUMENTAȚIE
+          Versiune 1.1  |  Autor: Craxor
 ================================================================================
-[0]
-IMPORTANT , INAINTE DE TOATE!
---------------------------------------------------------------------------------
-Fisierul metin2Core.amxx odata ce e compilat, trebuie sa fie PRIMUL SCRIS CAT MAI SUS in plugins.ini inainte
-oricarui alt plugin inafara celor amxx default. 
 
-Orice plugin Extern care foloseste metin2 api trebuie sa fie intodeauna sub metin2Core.amxx ! ! !
+[0] IMPORTANT – CITIȚI ÎNAINTE DE TOATE!
 --------------------------------------------------------------------------------
+1. Fișierul compilat metin2Core.amxx TREBUIE să fie primul (sau printre primele)
+   plugin-uri non-default din plugins.ini.
 
-[1] DESPRE MOD / DESCRIERE GENERALA
---------------------------------------------------------------------------------
-Plugin-ul 'Metin2RPG Core' transforma serverul clasic de Counter-Strike 1.6 intr-un 
-RPG interactiv bazat pe mecanicile jocului Metin2. Jucatorii pot sa isi aleaga 
-o rasa (Razboinic, Sura, Ninja, Saman), sa faca Level-Up omorand adversari, sa 
-aloce puncte de Statut (STR, HP, DEX, INT), sa invete si sa foloseasca Skill-uri 
-active/pasive, sa cumpere si sa ecipeze Iteme din Magazin si sa le imbunatateasca 
-la Fierar (Upgrade +1 pana la +9).
+2. Orice plugin extern care folosește API-ul Metin2 (metin2_api.inc) TREBUIE
+   să fie încărcat DUPĂ metin2Core.amxx.
 
-Sistemul include economie de Yang, bara de Mana (MP) cu regenerare automata, 
-un sistem dinamic de iteme extensibil prin API/Natives, salvare automata prin 
-nVault Array si securitate impotriva schimbarii numelui in timpul jocului.
+3. Dacă schimbați MAX_SKILLS sau structura PlayerData, recomandat să schimbați
+   și numele vault-ului (ex: "metin2_rpg_v2") ca să evitați date corupte.
 
 --------------------------------------------------------------------------------
-[2] INSTALARE & CERINȚE TEHNICE
+[1] DESPRE MOD
 --------------------------------------------------------------------------------
-Cerințe de Sistem / Cerințe Mod:
- - Server Counter-Strike 1.6
- - AMX Mod X versiunea 1.10 sau mai noua: https://www.amxmodx.org/downloads.php
- - ReAPI (HookChain & ReGamedll): 
-		https://github.com/rehlds/ReAPI  
-		https://github.com/rehlds/ReGameDLL_CS
- - Module AMXX active: nvault, nvault_array, fakemeta, hamsandwich, fun, reapi
-	Nvault Array: https://forums.alliedmods.net/showthread.php?t=291662
+Metin2 RPG Core transformă serverul clasic de Counter-Strike 1.6 într-un RPG
+complet inspirat din Metin2.
 
-Pasi de Instalare:
- 1. Descarca / Copiaza fisierul sursa 'metin2_rpg.sma' in directorul:
-    addons/amxmodx/scripting/
+Jucătorii pot:
+- Alege una din cele 4 rase (Războinic, Sura, Ninja, Șaman)
+- Alege una din cele 2 căi de skill-uri pe rasă (total 8 căi / 40 skill-uri)
+- Face Level-Up omorând adversari
+- Aloca puncte de Statut (STR, HP, DEX, INT)
+- Învăța și folosi skill-uri active
+- Cumpăra, echipa și upgrada iteme (+0 → +9)
+- Folosi economie Yang + sistem de Mana (MP) cu regenerare
 
- 2. Copiaza fisierul include 'metin2_rpg.inc' in directorul:
-    addons/amxmodx/scripting/include/
-
- 3. Compileaza plugin-ul 'metin2_rpg.sma'.
-    (Poti folosi compilatorul local amxxpc sau cel online).
-
- 4. Muta fisierul compilat 'metin2_rpg.amxx' din 'scripting/compiled/' in:
-    addons/amxmodx/plugins/
-
- 5. Deschide fisierul:
-    addons/amxmodx/configs/plugins.ini
-    si adauga la sfarsitul fisierului linia:
-    metin2_rpg.amxx
-
- 6. Schimba harta sau da restart la server (amx_rcon restart / map).
+Sistemul include salvare automată (nVault Array), protecție împotriva
+schimbării numelui și un API complet pentru dezvoltatori.
 
 --------------------------------------------------------------------------------
-[3] TOATE COMENZILE DIN JOC (CHAT & CONSOLA)
+[2] CERINȚE TEHNICE
 --------------------------------------------------------------------------------
-Comenzi Chat pentru Jucatori (se scriu in chat cu / sau fara /):
- - /menu, /metin2    : Deschide Meniul Principal Metin2.
- - /stats, /statut   : Deschide meniul de alocare a punctelor de Statut (STR, HP, DEX, INT).
- - /skills           : Deschide meniul de Skill-uri (alocare puncte & nivel skill).
- - /inventar, /inv   : Deschide inventarul cu itemele detinute si echipate.
- - /upgrade, /fierar : Deschide meniul Fierarului pentru imbunatatirea itemelor.
- - /shop, /magazin   : Deschide Magazinul de unde poti cumpara arme, armuri, accesorii si licori.
- - /binds            : Afiseaza ghidul si comenzile pentru setarea tastelor rapide (binds).
- - /reset            : Reseteaza rasa, statusurile si skill-urile (pastreaza Lvl, XP, Yang, Echipament).
+- Counter-Strike 1.6 Server
+- AMX Mod X 1.10 sau mai nou
+- ReAPI + ReGameDLL_CS
+- Module obligatorii: reapi, fakemeta, hamsandwich, fun, nvault, nvault_array
 
-Comenzi Consola pentru Jucatori (pentru Bind-uri):
- - skill1            : Activeaza Skill-ul 1 al rasei tale.
- - skill2            : Activeaza Skill-ul 2 al rasei tale.
- - skill3            : Activeaza Skill-ul 3 al rasei tale.
- - skill4            : Activeaza Skill-ul 4 al rasei tale.
- - skill5            : Activeaza Skill-ul 5 al rasei tale.
-
-Comenzi Administrative (Consola / AMX Admin cu acces FLAG A):
- - amx_set_level <nume/#userid> <level>        : Seteaza nivelul direct al unui jucator (1-999).
- - amx_set_xp <nume/#userid> <xp>              : Seteaza valoarea exacta de XP a unui jucator.
- - amx_set_statuspoints <nume/#userid> <puncte>: Seteaza numarul de Puncte Statut disponibile.
- - amx_set_skillpoints <nume/#userid> <puncte> : Seteaza numarul de Puncte Skill disponibile.
- - amx_set_yang <nume/#userid> <yang>          : Seteaza cantitatea de Yang detinuta de un jucator.
+Link-uri utile:
+- AMX Mod X: https://www.amxmodx.org/downloads.php
+- ReAPI: https://github.com/rehlds/ReAPI
+- nVault Array: https://forums.alliedmods.net/showthread.php?t=291662
 
 --------------------------------------------------------------------------------
-[4] CVAR-URI (SETARI SERVER)
+[3] INSTALARE PAS CU PAS
 --------------------------------------------------------------------------------
-Setarile pot fi adaugate sau modificate in 'amxmodx/configs/amxx.cfg':
+1. Copiați metin2Core.sma în:
+   addons/amxmodx/scripting/
 
- - amx_metin2_xp_kill <numar>         (Default: 100)
-   Cantitatea de XP primita pentru fiecare eliminare de jucator.
+2. Copiați metin2_api.inc în:
+   addons/amxmodx/scripting/include/
 
- - amx_metin2_xp_hs_bonus <numar>     (Default: 50)
-   XP bonus acordat daca eliminarea a fost facuta prin Headshot.
+3. Compilați metin2Core.sma
+   (amxxpc local sau compilator online)
 
- - amx_metin2_yang_kill <numar>       (Default: 500)
-   Cantitatea de Yang primita la fiecare kill.
+4. Mutați fișierul generat metin2Core.amxx în:
+   addons/amxmodx/plugins/
 
- - amx_metin2_yang_hs_bonus <numar>   (Default: 250)
-   Yang bonus acordat pentru uciderea inamicilor prin Headshot.
+5. Deschideți addons/amxmodx/configs/plugins.ini
+   și adăugați linia (cât mai sus posibil, după plugin-urile default):
+   metin2Core.amxx
 
- - amx_metin2_upgrade_fail_destroy <0|1> (Default: 1)
-   Setare Fierar: 1 = Itemul se distruge complet daca upgrade-ul esueaza.
-                  0 = Itemul doar scade in nivel / ramane la fel (in functie de logica extinsa).
+6. (Opțional) Adăugați cvar-urile din secțiunea [5] în amxx.cfg
 
---------------------------------------------------------------------------------
-[5] RASE, SKILL-URI SI MECANICI DE JOC
---------------------------------------------------------------------------------
-1. RASE DISPONIBILE:
- - Razboinic : Axat pe atac fizic ridicat, rezistenta la daune si stuns.
- - Sura      : Imbina atacurile magice cu protectia, reflectarea daunelor si penetrarea armurii.
- - Ninja     : Infiltrator rapid cu stealth, viteza sporita, critice x3 (Ambush) si otrava.
- - Saman     : Sustinere si magie: vindecare HP, buff de aparare, resetare cooldowns si stun/flash.
-
-2. LISTA SKILL-URI PER RASA:
- * Razboinic:
-   - Skill 1: Aura Sabiei (Bonus masiv de daune bazat pe nivel)
-   - Skill 2: Corp Rezistent (Reducere procentuala de daune de pana la 55%)
-   - Skill 3: Izbitura (Ingheata/Stuneaza tinta tintita)
-   - Skill 4: Atac Sabie (Dash rapid inainte)
-   - Skill 5: Vartej Sabie (Atac AoE circular pe o raza definita)
-
- * Sura:
-   - Skill 1: Tais Vrajit (Daune magice amplificate de INT)
-   - Skill 2: Armura Vrajita (Reflecta 35% din daunele primite inapoi la atacator)
-   - Skill 3: Lovitura Degetului (Armor Pierce: ignora pana la 70% din apararea tintei)
-   - Skill 4: Atacul Fulgerului (Incetineste viteza de deplasare a tintei la 110)
-   - Skill 5: Pietrificare (Stun complet + slow rezidual dupa unfreeze)
-
- * Ninja:
-   - Skill 1: Camuflaj (Transparenata aproape totala - stealth)
-   - Skill 2: Atacul Fulgerator (Viteza extrema de deplasare)
-   - Skill 3: Ambush (Urmatorul atac aplicat devine CRITIC cu daune x3)
-   - Skill 4: Otrava (Daune periodice in timp / DoT pe tinta)
-   - Skill 5: Ploaie de Sageti (Atac AoE la distanta)
-
- * Saman:
-   - Skill 1: Lecuire (Vindeca HP-ul propriu calculat dupa INT si nivel skill)
-   - Skill 2: Atac Intens (Buff temporar de daune)
-   - Skill 3: Binecuvantare (Ofera aparare suplimentara masiva)
-   - Skill 4: Iutesenie (Reseteaza instant cooldown-urile tuturor celorlalte skill-uri)
-   - Skill 5: Chemarea Fulgerului (Efect de orbire/flash + sansa de stun in zona)
-
-3. ATRIBUTE / STATUT:
- - STR (Forță)     : Crește daunele fizice aplicate.
- - HP (Viata)      : Oferă +10 Viata maxima per punct alocat.
- - DEX (Agilitate) : Mareste apararea nativa si scala abilitatile de Ninja.
- - INT (Inteligenta): Crește Mana Maxima (+8 MP/punct), viteza de regenerare MP si puterea skill-urilor magice.
+7. Schimbați harta sau dați restart serverului.
 
 --------------------------------------------------------------------------------
-[6] ITEME, MAGAZIN & FIERAR (UPGRADE)
+[4] COMENZI
 --------------------------------------------------------------------------------
-Sistem de Echipament:
- Jucatorii pot echipa pana la 6 sloturi:
- [0] Arma | [1] Armura | [2] Coif | [3] Scut | [4] Papuci | [5] Bijuterii
+Comenzi Chat (jucători):
+  /menu  sau  /metin2     → Meniu Principal
+  /stats  sau  /statut    → Alocare puncte de Statut
+  /skills                 → Meniu Skill-uri (calea aleasă)
+  /inventar  sau  /inv    → Inventar & Echipament
+  /upgrade  sau  /fierar  → Fierar (Upgrade iteme)
+  /shop  sau  /magazin    → Magazin
+  /binds                  → Ghid bind-uri
+  /reset                  → Resetează rasa + stats + skill-uri
+                            (păstrează Level, XP, Yang, Inventar, Echipament)
 
-Magazin (Shop):
- De unde se pot achizitiona iteme default (Luna Plina, Armura Posedata, Scut Titan, 
- Cercei de Abanos, Lichior HP/MP etc.) in schimbul monedei Yang.
+Comenzi Consolă (pentru bind-uri):
+  skill1                  → Activează Skill 1
+  skill2                  → Activează Skill 2
+  skill3                  → Activează Skill 3
+  skill4                  → Activează Skill 4
+  skill5                  → Activează Skill 5
+
+Comenzi Admin (FLAG A):
+  amx_set_level <nume/#userid> <level>
+  amx_set_xp <nume/#userid> <xp>
+  amx_set_statuspoints <nume/#userid> <puncte>
+  amx_set_skillpoints <nume/#userid> <puncte>
+  amx_set_yang <nume/#userid> <yang>
+
+--------------------------------------------------------------------------------
+[5] CVAR-URI
+--------------------------------------------------------------------------------
+Adaugă în amxx.cfg sau server.cfg:
+
+amx_metin2_xp_kill "100"                 // XP pe kill
+amx_metin2_xp_hs_bonus "50"              // XP bonus Headshot
+amx_metin2_yang_kill "500"               // Yang pe kill
+amx_metin2_yang_hs_bonus "250"           // Yang bonus Headshot
+amx_metin2_upgrade_fail_destroy "1"      // 1 = itemul se distruge la fail
+                                         // 0 = doar scade nivelul
+
+--------------------------------------------------------------------------------
+[6] RASE & CĂI DE SKILL-URI
+--------------------------------------------------------------------------------
+Fiecare rasă are 2 căi (Path A și Path B). După ce alegi rasa, trebuie să alegi
+calea. Abia după ce ai calea poți învăța skill-uri.
+
+┌─────────────┬──────────────────────┬──────────────────────┐
+│ Rasă        │ Path A               │ Path B               │
+├─────────────┼──────────────────────┼──────────────────────┤
+│ Războinic   │ Corporal             │ Mental               │
+│ Sura        │ Arme Magice          │ Magie Neagră         │
+│ Ninja       │ Lame (Cuțite)        │ Arc                  │
+│ Șaman       │ Zmeu (Dragon)        │ Fulger (Vindecare)   │
+└─────────────┴──────────────────────┴──────────────────────┘
+
+--------------------------------------------------------------------------------
+[7] LISTA COMPLETĂ A SKILL-URILOR (40)
+--------------------------------------------------------------------------------
+
+=== RĂZBOINIC – Corporal (Path A) ===
+1. Aura Sabiei          – Bonus masiv de daune
+2. Corp Rezistent       – Reducere daune (până la 55%)
+3. Izbitura             – Stun / înghețare țintă
+4. Atac Sabie           – Dash rapid înainte
+5. Vârtej Sabie         – Atac AoE circular
+
+=== RĂZBOINIC – Mental (Path B) ===
+1. Lovitura Spiritului  – Daune magice single-target
+2. Scut Mental          – Reducere daune temporară
+3. Valul de Putere      – AoE + knockback
+4. Concentrare          – Buff damage + următorul atac CRIT x2
+5. Explozie Interioară  – AoE puternic (costă puțin HP)
+
+=== SURA – Arme Magice (Path A) ===
+1. Tăiș Vrăjit          – Daune magice amplificate de INT
+2. Armură Vrăjită       – Reflectă 35% din daune
+3. Lovitura Degetului   – Armor Pierce (ignoră până la 70% apărare)
+4. Atacul Fulgerului    – Încetinește ținta
+5. Pietrificare         – Stun + slow rezidual
+
+=== SURA – Magie Neagră (Path B) ===
+1. Flacăra Întunecată   – Damage + DoT
+2. Blestem              – Slow + debuff
+3. Absorbție de Suflet  – Damage + lifesteal
+4. Umbre                – Almost invis + speed
+5. Invocarea Haosului   – AoE dark puternic
+
+=== NINJA – Lame / Cuțite (Path A) ===
+1. Camuflaj             – Stealth aproape total
+2. Atacul Fulgerător    – Viteza extremă
+3. Ambush               – Următorul atac = CRIT x3
+4. Otrava               – DoT pe țintă
+5. Dansul Lamelor       – AoE melee
+
+=== NINJA – Arc (Path B) ===
+1. Ploaie de Săgeți     – AoE la distanță
+2. Săgeată Explozivă    – Damage + mic AoE
+3. Țintire Precisă      – Următorul atac CRIT x3
+4. Săgeată Otrăvită     – DoT puternic
+5. Val de Săgeți        – AoE rapid pe rază mare
+
+=== ȘAMAN – Zmeu / Dragon (Path A) ===
+1. Chemarea Dragonului  – (placeholder / custom)
+2. Flacăra Dragonului   – (placeholder / custom)
+3. Scut de Solzi        – (placeholder / custom)
+4. Zborul Dragonului    – (placeholder / custom)
+5. Furia Dragonului     – (placeholder / custom)
+
+=== ȘAMAN – Fulger / Vindecare (Path B) ===
+1. Lecuire              – Vindecare HP puternică
+2. Atac Intens          – Buff de daune
+3. Binecuvântare        – Bonus apărare mare
+4. Iuteșenie            – Resetează toate cooldown-urile
+5. Chemarea Fulgerului  – Flash + șansă de stun în zonă
+
+Notă: Skill-urile de pe Path A la Șaman (Zmeu) pot fi personalizate ulterior.
+Skill-urile de pe Path B sunt deja funcționale.
+
+--------------------------------------------------------------------------------
+[8] ATRIBUTE (STATUT)
+--------------------------------------------------------------------------------
+STR (Forță)       → Crește daunele fizice
+HP  (Viață)       → +10 HP maxim per punct
+DEX (Agilitate)   → Crește apărarea nativă
+INT (Inteligență) → +8 Max MP per punct + putere skill-uri magice + regenerare MP
+
+La fiecare Level-Up primești:
+- +1 Punct de Statut
+- +1 Punct de Skill
+
+--------------------------------------------------------------------------------
+[9] ITEME, MAGAZIN & FIERAR
+--------------------------------------------------------------------------------
+Sloturi de echipament:
+  0 = Armă
+  1 = Armură
+  2 = Coif
+  3 = Scut
+  4 = Papuci
+  5 = Bijuterie
+
+Magazinul conține iteme default (arme, armuri, coifuri, scuturi, papuci,
+bijuterii și licori HP/MP). Poți adăuga iteme noi din alte plugin-uri
+folosind native-ul m2_register_item.
 
 Fierar (Upgrade):
- Itemele pot fi imbunatatite de la +0 pana la +9. Fiecare nivel de upgrade adauga 
- bonusuri suplimentare la stats, HP sau viteza. Atentie: Daca upgrade-ul esueaza si 
- cvar-ul 'amx_metin2_upgrade_fail_destroy' este 1, itemul va fi distrus!
+- Itemele pot fi upgradate de la +0 până la +9
+- Fiecare nivel de upgrade dă bonusuri suplimentare
+- Șansa de succes scade odată cu nivelul
+- Dacă upgrade-ul eșuează și cvar-ul este 1 → itemul este distrus
 
 --------------------------------------------------------------------------------
-[7] API PENTRU DEVOLOPERI (NATIVES & FORWARDS)
+[10] API PENTRU DEZVOLTATORI
 --------------------------------------------------------------------------------
-Plugin-ul ofera o librarie completa 'metin2_rpg' pentru a permite altor plugin-uri 
-sa interactioneze cu modul:
+Include: #include <metin2_api>
 
-Natives principale:
- - m2_register_item(...) : Inregistreaza dinamice iteme noi in magazin/joc.
- - get_user_m2_level(id) / set_user_m2_level(id, level)
- - get_user_m2_xp(id) / set_user_m2_xp(id, xp)
- - get_user_m2_yang(id) / set_user_m2_yang(id, yang)
- - get_user_m2_race(id)
- - get_user_m2_str(id), get_user_m2_hp(id), get_user_m2_dex(id), get_user_m2_int(id)
- - get_user_m2_mp(id), get_user_m2_maxmp(id)
+Natives disponibile:
+  m2_register_item(...)
+  get_user_m2_level(id)          /  set_user_m2_level(id, level)
+  get_user_m2_xp(id)             /  set_user_m2_xp(id, xp)
+  get_user_m2_yang(id)           /  set_user_m2_yang(id, yang)
+  get_user_m2_race(id)           /  set_user_m2_race(id, race)
+  get_user_m2_str(id)            /  set_user_m2_str(id, amount)
+  get_user_m2_hp(id)             /  set_user_m2_hp(id, amount)
+  get_user_m2_dex(id)            /  set_user_m2_dex(id, amount)
+  get_user_m2_int(id)            /  set_user_m2_int(id, amount)
+  get_user_m2_mp(id)             /  set_user_m2_mp(id, amount)
+  get_user_m2_maxmp(id)          /  set_user_m2_maxmp(id, amount)
 
-Forwards disponibile:
- - m2_skill_used(id, skill_idx, skill_level)
- - m2_level_up(id, new_level)
- - m2_player_kill(killer, victim, xp, yang)
- - m2_item_equipped(id, itemid, slot)
- - m2_item_unequipped(id, itemid, slot)
- - m2_upgrade_success(id, itemid, new_upgrade)
- - m2_upgrade_fail(id, itemid, destroyed)
- - m2_race_selected(id, race)
- - m2_stat_allocated(id, stat_type)
- - m2_skill_learned(id, skill_idx, new_level)
+Forwards:
+  m2_skill_used(id, skill_idx, skill_level)
+  m2_level_up(id, new_level)
+  m2_player_kill(killer, victim, xp, yang)
+  m2_item_equipped(id, itemid, slot)
+  m2_item_unequipped(id, itemid, slot)
+  m2_upgrade_success(id, itemid, new_upgrade)
+  m2_upgrade_fail(id, itemid, destroyed)
+  m2_race_selected(id, race)
+  m2_stat_allocated(id, stat_type)
+  m2_skill_learned(id, skill_idx, new_level)
 
+Constante utile:
+  M2_RACE_NONE, M2_RACE_WARRIOR, M2_RACE_SURA, M2_RACE_NINJA, M2_RACE_SHAMAN
+  M2_SLOT_WEAPON ... M2_SLOT_JEWEL
+  M2_STAT_STR, M2_STAT_HP, M2_STAT_DEX, M2_STAT_INT
+  ITEM_WEAPON ... ITEM_POTION
+
+--------------------------------------------------------------------------------
+[11] SFATURI & NOTE
+--------------------------------------------------------------------------------
+- Meniurile de Stats și Skills rămân deschise până apeși 0 (Exit).
+- Dacă un jucător nu are rasă, pe HUD apare mesajul:
+  "Scrie /menu sau /metin2 ca sa-ti alegi caracterul si sa incepi jocul!"
+- Skill-urile consumă Mana. Cooldown-ul scade pe măsură ce upgradezi skill-ul.
+- /reset șterge rasa, calea, stats și skill-uri, dar păstrează Level, XP, Yang
+  și tot inventarul/echipamentul.
+
+================================================================================
+          Sfârșitul documentației – Metin2 RPG Core v1.1
 ================================================================================
