@@ -177,6 +177,71 @@ native get_user_m2_mp(id);
  */
 native get_user_m2_maxmp(id);
 
+/**
+ * Seteaza rasa jucatorului
+ *
+ * @param id        Indexul jucatorului
+ * @param race      Rasa (M2_RACE_NONE / WARRIOR / SURA / NINJA / SHAMAN)
+ * @return          1 la succes, 0 la esec
+ */
+native set_user_m2_race(id, race);
+
+/**
+ * Seteaza valoarea STR
+ *
+ * @param id        Indexul jucatorului
+ * @param amount    Noua valoare (minim 1 recomandat)
+ * @return          1 la succes, 0 la esec
+ */
+native set_user_m2_str(id, amount);
+
+/**
+ * Seteaza valoarea HP (stat)
+ *
+ * @param id        Indexul jucatorului
+ * @param amount    Noua valoare (minim 1 recomandat)
+ * @return          1 la succes, 0 la esec
+ */
+native set_user_m2_hp(id, amount);
+
+/**
+ * Seteaza valoarea DEX
+ *
+ * @param id        Indexul jucatorului
+ * @param amount    Noua valoare (minim 1 recomandat)
+ * @return          1 la succes, 0 la esec
+ */
+native set_user_m2_dex(id, amount);
+
+/**
+ * Seteaza valoarea INT
+ *
+ * @param id        Indexul jucatorului
+ * @param amount    Noua valoare (minim 1 recomandat)
+ * @return          1 la succes, 0 la esec
+ */
+native set_user_m2_int(id, amount);
+
+/**
+ * Seteaza mana curenta
+ *
+ * @param id        Indexul jucatorului
+ * @param amount    Noua valoare (va fi clamp-uita la 0..MaxMP)
+ * @return          1 la succes, 0 la esec
+ */
+native set_user_m2_mp(id, amount);
+
+/**
+ * Seteaza mana maxima
+ *
+ * @param id        Indexul jucatorului
+ * @param amount    Noua valoare (minim 1)
+ * @return          1 la succes, 0 la esec
+ *
+ * Nota: Daca setezi MaxMP sub MP curent, MP-ul va fi ajustat automat.
+ */
+native set_user_m2_maxmp(id, amount);
+
 // ======================== FORWARDS ========================
 
 /**
@@ -315,14 +380,25 @@ stock m2_get_race_name(race, output[], len)
  */
 stock m2_get_skill_name(skill_idx, output[], len)
 {
-	static const skill_names[20][] = {
+	static const skill_names[40][] = {
+		// WARRIOR - Corporal (0-4) / Mental (5-9)
 		"Aura Sabiei", "Corp Rezistent", "Izbitura", "Atac Sabie", "Vartej Sabie",
+		"Lovitura Spiritului", "Scut Mental", "Valul de Putere", "Concentrare", "Explozie Interioara",
+		
+		// SURA - Arme Magice (10-14) / Magie Neagra (15-19)
 		"Tais Vrajit", "Armura Vrajita", "Lovitura Degetului", "Atacul Fulgerului", "Pietrificare",
-		"Camuflaj", "Atacul Fulgerator", "Ambush", "Otrava", "Ploaie de Sageti",
+		"Flacara Intunecata", "Blestem", "Absorbtie de Suflet", "Umbre", "Invocarea Haosului",
+		
+		// NINJA - Lame (20-24) / Arc (25-29)
+		"Camuflaj", "Atacul Fulgerator", "Ambush", "Otrava", "Dansul Lamelor",
+		"Ploaie de Sageti", "Sageata Exploziva", "Tintire Precisa", "Sageata Otravita", "Val de Sageti",
+		
+		// SHAMAN - Zmeu/Dragon (30-34) / Fulger/Vindecare (35-39)
+		"Chemarea Dragonului", "Flacara Dragonului", "Scut de Solzi", "Zborul Dragonului", "Furia Dragonului",
 		"Lecuire", "Atac Intens", "Binecuvantare", "Iutesenie", "Chemarea Fulgerului"
 	};
 	
-	if (skill_idx < 0 || skill_idx >= 20)
+	if (skill_idx < 0 || skill_idx >= 40)
 	{
 		copy(output, len, "Invalid");
 		return;
@@ -457,12 +533,15 @@ stock m2_add_xp(id, amount)
  * @param race      Rasa (M2_RACE_*)
  * @return          Indexul de start sau -1 daca rasa e invalida
  */
-stock m2_get_race_skill_start(race)
+stock m2_get_race_skill_start(race, path = 1)
 {
 	if (race < M2_RACE_WARRIOR || race > M2_RACE_SHAMAN)
 		return -1;
 	
-	return (race - 1) * 5;
+	if (path <= 0)
+		path = 1;
+	
+	return (race - 1) * 10 + (path - 1) * 5;
 }
 
 /**
@@ -470,11 +549,18 @@ stock m2_get_race_skill_start(race)
  *
  * @param skill_idx     Indexul skill-ului
  * @param race          Rasa
+ * @param path          0 = verifica ambele cai, altfel PATH_A(1) / PATH_B(2)
  * @return              true daca skill-ul apartine rasei
  */
-stock bool:m2_skill_belongs_to_race(skill_idx, race)
+stock bool:m2_skill_belongs_to_race(skill_idx, race, path = 0)
 {
-	new start = m2_get_race_skill_start(race);
+	if (race < M2_RACE_WARRIOR || race > M2_RACE_SHAMAN)
+		return false;
+	
+	if (path == 0) // verifică ambele căi
+		return (skill_idx >= (race - 1) * 10 && skill_idx < race * 10);
+	
+	new start = m2_get_race_skill_start(race, path);
 	if (start == -1)
 		return false;
 	
