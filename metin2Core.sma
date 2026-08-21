@@ -85,12 +85,12 @@ stock debug_log(iDebugLevel = 0, const szMessage[], any:...)
 #endif
 
 #define PLUGIN  "Metin2Core"
-#define VERSION "1.0"
+#define VERSION "1.1"
 #define AUTHOR  "Craxor"
 
 #define MAX_PLAYERS          32
 #define MAX_INVENTORY        30
-#define MAX_SKILLS           20
+#define MAX_SKILLS           40
 #define MAX_UPGRADE          9
 
 #define RACE_NONE            0
@@ -128,6 +128,7 @@ enum _:PlayerData
 	g_INT,
 	g_StatPoints,
 	g_SkillPoints,
+	g_SkillPath,                 
 	g_SkillLevel[MAX_SKILLS],
 	g_Equipped[MAX_EQUIP_SLOTS],
 	g_EquippedUpgrade[MAX_EQUIP_SLOTS],
@@ -137,6 +138,10 @@ enum _:PlayerData
 	g_MP,
 	g_MaxMP
 };
+
+#define PATH_NONE            0
+#define PATH_A               1
+#define PATH_B               2
 
 enum _:ItemStruct
 {
@@ -183,10 +188,37 @@ new const g_RaceName[][] = {
 };
 
 new const g_SkillName[MAX_SKILLS][] = {
+	// ===== WARRIOR - Corporal (0-4) =====
 	"Aura Sabiei", "Corp Rezistent", "Izbitura", "Atac Sabie", "Vartej Sabie",
+	
+	// ===== WARRIOR - Mental (5-9) =====
+	"Lovitura Spiritului", "Scut Mental", "Valul de Putere", "Concentrare", "Explozie Interioara",
+	
+	// ===== SURA - Arme Magice (10-14) =====
 	"Tais Vrajit", "Armura Vrajita", "Lovitura Degetului", "Atacul Fulgerului", "Pietrificare",
-	"Camuflaj", "Atacul Fulgerator", "Ambush", "Otrava", "Ploaie de Sageti",
+	
+	// ===== SURA - Magie Neagra (15-19) =====
+	"Flacara Intunecata", "Blestem", "Absorbție de Suflet", "Umbre", "Invocarea Haosului",
+	
+	// ===== NINJA - Lame / Cuțite (20-24) =====
+	"Camuflaj", "Atacul Fulgerator", "Ambush", "Otrava", "Dansul Lamelor",
+	
+	// ===== NINJA - Arc (25-29) =====
+	"Ploaie de Sageti", "Sageata Exploziva", "Tintire Precisa", "Sageata Otravita", "Val de Sageti",
+	
+	// ===== SHAMAN - Zmeu / Dragon (30-34) =====
+	"Chemarea Dragonului", "Flacara Dragonului", "Scut de Solzi", "Zborul Dragonului", "Furia Dragonului",
+	
+	// ===== SHAMAN - Fulger / Vindecare (35-39) =====
 	"Lecuire", "Atac Intens", "Binecuvantare", "Iutesenie", "Chemarea Fulgerului"
+};
+
+new const g_PathName[][][] = {
+	{ "", "" },                          // index 0 nefolosit
+	{ "Corporal", "Mental" },            // Warrior
+	{ "Arme Magice", "Magie Neagra" },   // Sura
+	{ "Lame", "Arc" },                   // Ninja
+	{ "Zmeu", "Fulger" }                 // Shaman
 };
 
 // Cost mana pe skill (baza)
@@ -222,6 +254,13 @@ public plugin_natives()
 	register_native("get_user_m2_int", "_get_user_m2_int");
 	register_native("get_user_m2_mp", "_get_user_m2_mp");
 	register_native("get_user_m2_maxmp", "_get_user_m2_maxmp");
+	register_native("set_user_m2_race",   "_set_user_m2_race");
+	register_native("set_user_m2_str",    "_set_user_m2_str");
+	register_native("set_user_m2_hp",     "_set_user_m2_hp");
+	register_native("set_user_m2_dex",    "_set_user_m2_dex");
+	register_native("set_user_m2_int",    "_set_user_m2_int");
+	register_native("set_user_m2_mp",     "_set_user_m2_mp");
+	register_native("set_user_m2_maxmp",  "_set_user_m2_maxmp");
 }
 
 public plugin_init()
@@ -523,6 +562,120 @@ public _get_user_m2_maxmp(plugin, params)
 	return g_Player[id][g_MaxMP];
 }
 
+public _set_user_m2_race(plugin, params)
+{
+	new id = get_param(1);
+	new race = get_param(2);
+
+	if (!is_user_connected(id))
+		return 0;
+
+	// Validare rasă (0-4)
+	if (race < RACE_NONE || race > RACE_SHAMAN)
+		return 0;
+
+	g_Player[id][g_Race] = race;
+
+	// Dacă setezi RACE_NONE, poți decide să resetezi și skill-urile (opțional)
+	// for (new i = 0; i < MAX_SKILLS; i++)
+	//     g_Player[id][g_SkillLevel][i] = 0;
+
+	recalc_max_mp(id);
+	save_player(id);
+	return 1;
+}
+
+public _set_user_m2_str(plugin, params)
+{
+	new id = get_param(1);
+	new amount = get_param(2);
+
+	if (!is_user_connected(id) || amount < 0)
+		return 0;
+
+	g_Player[id][g_STR] = amount;
+	save_player(id);
+	return 1;
+}
+
+public _set_user_m2_hp(plugin, params)
+{
+	new id = get_param(1);
+	new amount = get_param(2);
+
+	if (!is_user_connected(id) || amount < 0)
+		return 0;
+
+	g_Player[id][g_HP] = amount;
+	save_player(id);
+	return 1;
+}
+
+public _set_user_m2_dex(plugin, params)
+{
+	new id = get_param(1);
+	new amount = get_param(2);
+
+	if (!is_user_connected(id) || amount < 0)
+		return 0;
+
+	g_Player[id][g_DEX] = amount;
+	save_player(id);
+	return 1;
+}
+
+public _set_user_m2_int(plugin, params)
+{
+	new id = get_param(1);
+	new amount = get_param(2);
+
+	if (!is_user_connected(id) || amount < 0)
+		return 0;
+
+	g_Player[id][g_INT] = amount;
+	recalc_max_mp(id);          // INT influențează MaxMP
+	save_player(id);
+	return 1;
+}
+
+public _set_user_m2_mp(plugin, params)
+{
+	new id = get_param(1);
+	new amount = get_param(2);
+
+	if (!is_user_connected(id))
+		return 0;
+
+	if (amount < 0)
+		amount = 0;
+
+	if (amount > g_Player[id][g_MaxMP])
+		amount = g_Player[id][g_MaxMP];
+
+	g_Player[id][g_MP] = amount;
+	// Nu e obligatoriu să salvezi la fiecare set de MP (e volatil),
+	// dar dacă vrei consistență la reconnect poți lăsa save_player(id);
+	return 1;
+}
+
+public _set_user_m2_maxmp(plugin, params)
+{
+	new id = get_param(1);
+	new amount = get_param(2);
+
+	if (!is_user_connected(id) || amount < 1)
+		return 0;
+
+	g_Player[id][g_MaxMP] = amount;
+
+	// Dacă MP-ul curent depășește noul maxim, îl ajustăm
+	if (g_Player[id][g_MP] > amount)
+		g_Player[id][g_MP] = amount;
+
+	save_player(id);
+	return 1;
+}
+
 // ======================== NAME CHANGE BLOCK ========================
 public OnClientUserInfoChanged(id)
 {
@@ -628,6 +781,8 @@ stock reset_player(id)
 	g_PierceAmount[id] = 0.0;
 	g_BlessAmount[id] = 0.0;
 
+	g_Player[id][g_SkillPath] = PATH_NONE;
+
 	remove_task(id);		
 	if (is_user_connected(id))
 		set_user_rendering(id);
@@ -654,6 +809,10 @@ stock load_player(id)
 	{
 		g_Player[id][g_Level] = 1;
 		g_Player[id][g_Yang] = 1000;
+		g_Player[id][g_STR] = 1;
+		g_Player[id][g_HP] = 1;
+		g_Player[id][g_DEX] = 1;
+		g_Player[id][g_INT] = 1;
 		g_Player[id][g_MP] = 50;
 		g_Player[id][g_MaxMP] = 50;
 	}
@@ -840,7 +999,11 @@ public OnTakeDamage(victim, inflictor, attacker, Float:damage, damagebits)
 	
 	// Aura Sabiei / Tais Vrajit / Atac Intens
 	if (g_AuraActive[attacker])
-		weap_bonus += 25.0 + float(g_Player[attacker][g_SkillLevel][(g_Player[attacker][g_Race]-1)*5] * 2);
+	{
+		new atk_path = g_Player[attacker][g_SkillPath];
+		new atk_skill_idx = (g_Player[attacker][g_Race]-1)*10 + (atk_path-1)*5;
+		weap_bonus += 25.0 + float(g_Player[attacker][g_SkillLevel][atk_skill_idx] * 2);
+	}
 	
 	// Ambush (crit)
 	if (g_AmbushActive[attacker])
@@ -893,14 +1056,19 @@ public Task_HUD()
 	{
 		if (!is_user_connected(id) || is_user_bot(id))
 			continue;
-		if (g_Player[id][g_Race] == RACE_NONE)
-			continue;
-
-		new needed = get_xp_needed(g_Player[id][g_Level]);
 		
-		// Procent progres (cât ai făcut deja din nivelul curent)
+		// Dacă nu are rasă aleasă → mesaj de bun venit
+		if (g_Player[id][g_Race] == RACE_NONE)
+		{
+			set_hudmessage(255, 200, 0, -1.0, 0.90, 0, 0.0, 1.1, 0.0, 0.0, -1);
+			ShowSyncHudMsg(id, g_HudSync, "[Metin2] Scrie /menu sau /metin2 ca sa-ti alegi caracterul si sa incepi jocul!");
+			continue;
+		}
+		
+		// Jucătorul are rasă → HUD normal
+		new needed = get_xp_needed(g_Player[id][g_Level]);
 		new Float:pct = (float(g_Player[id][g_XP]) / float(needed)) * 100.0;
-
+		
 		set_hudmessage(0, 255, 100, -1.0, 0.90, 0, 0.0, 1.1, 0.0, 0.0, -1);
 		ShowSyncHudMsg(id, g_HudSync, "[Metin2] %s | Lvl %d | XP %.1f%% | Yang %d | MP %d/%d | Stat %d | SkillP %d",
 			g_RaceName[g_Player[id][g_Race]],
@@ -933,7 +1101,7 @@ public Task_ManaRegen()
 
 stock bool:can_use_skill(id, skill_slot)
 {
-	if (!is_user_alive(id) || g_Player[id][g_Race] == RACE_NONE)
+	if (!is_user_alive(id) || g_Player[id][g_Race] == RACE_NONE || g_Player[id][g_SkillPath] == PATH_NONE)
 		return false;
 	
 	new Float:now = get_gametime();
@@ -945,7 +1113,8 @@ stock bool:can_use_skill(id, skill_slot)
 	}
 	
 	new race = g_Player[id][g_Race];
-	new skill_idx = (race - 1) * 5 + skill_slot;
+	new path = g_Player[id][g_SkillPath];
+	new skill_idx = (race - 1) * 10 + (path - 1) * 5 + skill_slot;
 	
 	if (g_Player[id][g_SkillLevel][skill_idx] <= 0)
 	{
@@ -964,10 +1133,51 @@ stock bool:can_use_skill(id, skill_slot)
 	return true;
 }
 
+stock execute_skill(id, slot)
+{
+	if (!can_use_skill(id, slot))
+		return;
+	
+	new race = g_Player[id][g_Race];
+	new path = g_Player[id][g_SkillPath];
+	new skill_idx = (race - 1) * 10 + (path - 1) * 5 + slot;
+	new lvl = g_Player[id][g_SkillLevel][skill_idx];
+	
+	client_print_color(id, print_team_default, "^4[Metin2]^1 Activezi: ^3%s ^1(Nivel %d)", g_SkillName[skill_idx], lvl);
+	
+	switch (race)
+	{
+		case RACE_WARRIOR:
+		{
+			if (path == PATH_A) skill_warrior_corporal(id, slot, lvl);
+			else                skill_warrior_mental(id, slot, lvl);
+		}
+		case RACE_SURA:
+		{
+			if (path == PATH_A) skill_sura_arme(id, slot, lvl);
+			else                skill_sura_neagra(id, slot, lvl);
+		}
+		case RACE_NINJA:
+		{
+			if (path == PATH_A) skill_ninja_lame(id, slot, lvl);
+			else                skill_ninja_arc(id, slot, lvl);
+		}
+		case RACE_SHAMAN:
+		{
+			if (path == PATH_A) skill_shaman_zmeu(id, slot, lvl);
+			else                skill_shaman_fulger(id, slot, lvl);
+		}
+	}
+	
+	new ret;
+	ExecuteForward(g_fwd_SkillUsed, ret, id, skill_idx, lvl);
+}
+
 stock apply_skill_cooldown(id, skill_slot, Float:base_cd)
 {
 	new race = g_Player[id][g_Race];
-	new skill_idx = (race - 1) * 5 + skill_slot;
+	new path = g_Player[id][g_SkillPath];
+	new skill_idx = (race - 1) * 10 + (path - 1) * 5 + skill_slot;
 	new lvl = g_Player[id][g_SkillLevel][skill_idx];
 	
 	// Cooldown scade pe masura ce skill-ul creste
@@ -983,32 +1193,8 @@ public cmd_skill3(id) { execute_skill(id, 2); return PLUGIN_HANDLED; }
 public cmd_skill4(id) { execute_skill(id, 3); return PLUGIN_HANDLED; }
 public cmd_skill5(id) { execute_skill(id, 4); return PLUGIN_HANDLED; }
 
-stock execute_skill(id, slot)
-{
-	if (!can_use_skill(id, slot))
-		return;
-	
-	new race = g_Player[id][g_Race];
-	new skill_idx = (race - 1) * 5 + slot;
-	new lvl = g_Player[id][g_SkillLevel][skill_idx];
-	
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Activezi: ^3%s ^1(Nivel %d)", g_SkillName[skill_idx], lvl);
-	
-	switch (race)
-	{
-		case RACE_WARRIOR: skill_warrior(id, slot, lvl);
-		case RACE_SURA:    skill_sura(id, slot, lvl);
-		case RACE_NINJA:   skill_ninja(id, slot, lvl);
-		case RACE_SHAMAN:  skill_shaman(id, slot, lvl);
-	}
-	
-	// Forward skill used
-	new ret;
-	ExecuteForward(g_fwd_SkillUsed, ret, id, skill_idx, lvl);
-}
-
 // ---------- WARRIOR ----------
-stock skill_warrior(id, slot, lvl)
+stock skill_warrior_corporal(id, slot, lvl)
 {
 	new Float:power = float(lvl) * 1.8 + float(g_Player[id][g_INT]) * 0.6;
 	
@@ -1113,7 +1299,7 @@ public RemoveResist(id)
 }
 
 // ---------- SURA ----------
-stock skill_sura(id, slot, lvl)
+stock skill_sura_arme(id, slot, lvl)
 {	
 	switch (slot)
 	{
@@ -1249,6 +1435,8 @@ public cmd_reset(id)
 	g_ResistAmount[id] = 0.0;
 	g_PierceAmount[id] = 0.0;
 	g_BlessAmount[id] = 0.0;
+
+	g_Player[id][g_SkillPath] = PATH_NONE;
 	
 	remove_task(id);
 	if (is_user_alive(id))
@@ -1265,7 +1453,7 @@ public cmd_reset(id)
 }
 
 // ---------- NINJA ----------
-stock skill_ninja(id, slot, lvl)
+stock skill_ninja_lame(id, slot, lvl)
 {
 	switch (slot)
 	{
@@ -1338,7 +1526,7 @@ stock skill_ninja(id, slot, lvl)
 }
 
 // ---------- SHAMAN ----------
-stock skill_shaman(id, slot, lvl)
+stock skill_shaman_zmeu(id, slot, lvl)
 {
 	new Float:power = float(lvl) * 2.0 + float(g_Player[id][g_INT]) * 1.1;
 	
@@ -1431,6 +1619,447 @@ stock skill_shaman(id, slot, lvl)
 		}
 	}
 }
+
+
+// ======================== WARRIOR - MENTAL ========================
+stock skill_warrior_mental(id, slot, lvl)
+{
+	new Float:power = float(lvl) * 1.6 + float(g_Player[id][g_INT]) * 0.9;
+	
+	switch (slot)
+	{
+		case 0: // Lovitura Spiritului - damage magic single target
+		{
+			new target = get_aim_target(id);
+			if (is_user_alive(target))
+			{
+				new Float:dmg = 40.0 + power;
+				ExecuteHamB(Ham_TakeDamage, target, id, id, dmg, DMG_ENERGYBEAM);
+				apply_skill_cooldown(id, 0, 16.0);
+				client_print_color(id, print_team_default, "^4[Metin2]^1 Lovitura Spiritului: ^3%.0f^1 damage magic!", dmg);
+			}
+			else
+			{
+				apply_skill_cooldown(id, 0, 16.0);
+				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
+			}
+		}
+		case 1: // Scut Mental - absorb damage
+		{
+			g_ResistActive[id] = true;
+			g_ResistAmount[id] = 0.30 + (float(lvl) * 0.007);
+			if (g_ResistAmount[id] > 0.50) g_ResistAmount[id] = 0.50;
+			
+			new Float:dur = 6.5 + (lvl * 0.18);
+			set_user_rendering(id, kRenderFxGlowShell, 100, 100, 255, kRenderNormal, 35);
+			set_task(dur, "RemoveResist", id);
+			apply_skill_cooldown(id, 1, 26.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Scut Mental: reducere damage ^3%.0f%%^1 timp de %.1f sec!", g_ResistAmount[id]*100.0, dur);
+		}
+		case 2: // Valul de Putere - AoE knockback + small dmg
+		{
+			new Float:origin[3];
+			pev(id, pev_origin, origin);
+			
+			new Float:radius = 200.0 + (lvl * 2.5);
+			new Float:dmg = 25.0 + power * 0.7;
+			new hit = 0;
+			
+			for (new i = 1; i <= MaxClients; i++)
+			{
+				if (!is_user_alive(i) || i == id) continue;
+				if (get_user_team(i) == get_user_team(id)) continue;
+				
+				new Float:torigin[3];
+				pev(i, pev_origin, torigin);
+				
+				if (get_distance_f(origin, torigin) < radius)
+				{
+					ExecuteHamB(Ham_TakeDamage, i, id, id, dmg, DMG_SONIC);
+					
+					// mic knockback
+					new Float:vel[3];
+					vel[0] = (torigin[0] - origin[0]) * 2.5;
+					vel[1] = (torigin[1] - origin[1]) * 2.5;
+					vel[2] = 220.0;
+					set_pev(i, pev_velocity, vel);
+					hit++;
+				}
+			}
+			apply_skill_cooldown(id, 2, 22.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Valul de Putere: %d inamici loviti!", hit);
+		}
+		case 3: // Concentrare - buff damage + crit chance (folosim AmbushActive ca flag)
+		{
+			g_AmbushActive[id] = true; // reutilizăm flag-ul pentru următorul hit x2
+			g_AuraActive[id] = true;
+			new Float:dur = 7.0 + (lvl * 0.2);
+			set_user_rendering(id, kRenderFxGlowShell, 180, 180, 255, kRenderNormal, 40);
+			set_task(dur, "RemoveAura", id);
+			apply_skill_cooldown(id, 3, 20.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Concentrare: +damage + urmatorul atac CRIT x2 (%.0f sec)!", dur);
+		}
+		case 4: // Explozie Interioara - self damage + big AoE
+		{
+			new Float:origin[3];
+			pev(id, pev_origin, origin);
+			
+			new Float:dmg = 55.0 + power;
+			new hit = 0;
+			
+			// damage pe sine (mic)
+			ExecuteHamB(Ham_TakeDamage, id, id, id, 15.0, DMG_BLAST);
+			
+			for (new i = 1; i <= MaxClients; i++)
+			{
+				if (!is_user_alive(i) || i == id) continue;
+				if (get_user_team(i) == get_user_team(id)) continue;
+				
+				new Float:torigin[3];
+				pev(i, pev_origin, torigin);
+				
+				if (get_distance_f(origin, torigin) < 230.0)
+				{
+					ExecuteHamB(Ham_TakeDamage, i, id, id, dmg, DMG_BLAST);
+					hit++;
+				}
+			}
+			apply_skill_cooldown(id, 4, 30.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Explozie Interioara: AoE %.0f dmg | Inamici: %d", dmg, hit);
+		}
+	}
+}
+
+// ======================== SURA - MAGIE NEAGRA ========================
+stock skill_sura_neagra(id, slot, lvl)
+{
+	new Float:power = float(lvl) * 1.7 + float(g_Player[id][g_INT]) * 1.0;
+	
+	switch (slot)
+	{
+		case 0: // Flacara Intunecata - DoT + damage
+		{
+			new target = get_aim_target(id);
+			if (is_user_alive(target))
+			{
+				new Float:dmg = 30.0 + power * 0.8;
+				ExecuteHamB(Ham_TakeDamage, target, id, id, dmg, DMG_BURN);
+				
+				new taskid = (id * 100) + target + 5000; // offset ca să nu se ciocnească cu PoisonTick
+				set_task(1.0, "DarkFlameTick", taskid, _, _, "a", 4 + (lvl / 8));
+				
+				apply_skill_cooldown(id, 0, 18.0);
+				client_print_color(id, print_team_default, "^4[Metin2]^1 Flacara Intunecata: damage + DoT!");
+			}
+			else
+			{
+				apply_skill_cooldown(id, 0, 18.0);
+				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
+			}
+		}
+		case 1: // Blestem - reduce stats inamic (speed + damage reduction pe el)
+		{
+			new target = get_aim_target(id);
+			if (is_user_alive(target))
+			{
+				set_user_maxspeed(target, 130.0);
+				set_task(4.0 + (lvl * 0.12), "RestoreSpeed", target);
+				
+				// mic debuff de damage (folosim Reflect ca flag temporar pe victimă)
+				g_ReflectActive[target] = true; // o să-l folosim invers în OnTakeDamage dacă vrei
+				set_task(5.0, "RemoveReflect", target);
+				
+				apply_skill_cooldown(id, 1, 24.0);
+				client_print_color(id, print_team_default, "^4[Metin2]^1 Blestem: tinta incetinita + debuff!");
+			}
+			else
+			{
+				apply_skill_cooldown(id, 1, 24.0);
+				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
+			}
+		}
+		case 2: // Absorbție de Suflet - lifesteal
+		{
+			new target = get_aim_target(id);
+			if (is_user_alive(target))
+			{
+				new Float:dmg = 35.0 + power * 0.9;
+				ExecuteHamB(Ham_TakeDamage, target, id, id, dmg, DMG_ENERGYBEAM);
+				
+				new heal = floatround(dmg * 0.45);
+				new hp = get_user_health(id);
+				set_user_health(id, min(hp + heal, 100 + g_Player[id][g_HP] * 10 + 80));
+				
+				apply_skill_cooldown(id, 2, 17.0);
+				client_print_color(id, print_team_default, "^4[Metin2]^1 Absorbție de Suflet: %.0f dmg + %d HP!", dmg, heal);
+			}
+			else
+			{
+				apply_skill_cooldown(id, 2, 17.0);
+				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
+			}
+		}
+		case 3: // Umbre - invis + speed
+		{
+			new Float:dur = 4.0 + (lvl * 0.15);
+			set_user_rendering(id, kRenderFxNone, 0, 0, 0, kRenderTransAlpha, 15);
+			set_user_maxspeed(id, 380.0 + (lvl * 4.0));
+			set_task(dur, "RemoveInvis", id);
+			set_task(dur, "RestoreSpeed", id);
+			apply_skill_cooldown(id, 3, 26.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Umbre: aproape invizibil + viteza (%.1f sec)!", dur);
+		}
+		case 4: // Invocarea Haosului - big AoE dark
+		{
+			new Float:origin[3];
+			pev(id, pev_origin, origin);
+			
+			new Float:dmg = 48.0 + power;
+			new hit = 0;
+			
+			for (new i = 1; i <= MaxClients; i++)
+			{
+				if (!is_user_alive(i) || i == id) continue;
+				if (get_user_team(i) == get_user_team(id)) continue;
+				
+				new Float:torigin[3];
+				pev(i, pev_origin, torigin);
+				
+				if (get_distance_f(origin, torigin) < 260.0)
+				{
+					ExecuteHamB(Ham_TakeDamage, i, id, id, dmg, DMG_ENERGYBEAM);
+					hit++;
+				}
+			}
+			apply_skill_cooldown(id, 4, 34.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Invocarea Haosului: AoE %.0f dmg | Inamici: %d", dmg, hit);
+		}
+	}
+}
+
+public DarkFlameTick(taskid)
+{
+	new attacker = (taskid - 5000) / 100;
+	new target = (taskid - 5000) % 100;
+	
+	if (is_user_alive(target) && is_user_connected(attacker))
+		ExecuteHamB(Ham_TakeDamage, target, attacker, attacker, 8.0 + float(g_Player[attacker][g_INT]) * 0.25, DMG_BURN);
+}
+
+// ======================== NINJA - ARC ========================
+stock skill_ninja_arc(id, slot, lvl)
+{
+	new Float:power = float(lvl) * 1.9 + float(g_Player[id][g_DEX]) * 0.7 + float(g_Player[id][g_INT]) * 0.4;
+	
+	switch (slot)
+	{
+		case 0: // Ploaie de Sageti (deja exista pe Path A, dar aici o facem mai puternică pe Arc)
+		{
+			new Float:origin[3];
+			pev(id, pev_origin, origin);
+			
+			new Float:dmg = 32.0 + power;
+			new hit = 0;
+			
+			for (new i = 1; i <= MaxClients; i++)
+			{
+				if (!is_user_alive(i) || i == id) continue;
+				if (get_user_team(i) == get_user_team(id)) continue;
+				
+				new Float:torigin[3];
+				pev(i, pev_origin, torigin);
+				
+				if (get_distance_f(origin, torigin) < 280.0)
+				{
+					ExecuteHamB(Ham_TakeDamage, i, id, id, dmg, DMG_BULLET);
+					hit++;
+				}
+			}
+			apply_skill_cooldown(id, 0, 22.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Ploaie de Sageti: %.0f dmg | Inamici: %d", dmg, hit);
+		}
+		case 1: // Sageata Exploziva
+		{
+			new target = get_aim_target(id);
+			if (is_user_alive(target))
+			{
+				new Float:dmg = 45.0 + power;
+				ExecuteHamB(Ham_TakeDamage, target, id, id, dmg, DMG_BLAST);
+				
+				// mic AoE în jurul țintei
+				new Float:torigin[3];
+				pev(target, pev_origin, torigin);
+				
+				for (new i = 1; i <= MaxClients; i++)
+				{
+					if (!is_user_alive(i) || i == id || i == target) continue;
+					if (get_user_team(i) == get_user_team(id)) continue;
+					
+					new Float:o[3];
+					pev(i, pev_origin, o);
+					if (get_distance_f(torigin, o) < 150.0)
+						ExecuteHamB(Ham_TakeDamage, i, id, id, dmg * 0.5, DMG_BLAST);
+				}
+				
+				apply_skill_cooldown(id, 1, 19.0);
+				client_print_color(id, print_team_default, "^4[Metin2]^1 Sageata Exploziva: %.0f dmg + AoE!", dmg);
+			}
+			else
+			{
+				apply_skill_cooldown(id, 1, 19.0);
+				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
+			}
+		}
+		case 2: // Tintire Precisa - next hit guaranteed high damage
+		{
+			g_AmbushActive[id] = true; // x3 crit
+			apply_skill_cooldown(id, 2, 15.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Tintire Precisa: urmatorul atac este CRITIC x3!");
+		}
+		case 3: // Sageata Otravita
+		{
+			new target = get_aim_target(id);
+			if (is_user_alive(target))
+			{
+				new taskid = (id * 100) + target;
+				new ticks = 5 + (lvl / 5);
+				set_task(1.0, "PoisonTick", taskid, _, _, "a", ticks);
+				
+				apply_skill_cooldown(id, 3, 18.0);
+				client_print_color(id, print_team_default, "^4[Metin2]^1 Sageata Otravita: DoT puternic (%d tick-uri)!", ticks);
+			}
+			else
+			{
+				apply_skill_cooldown(id, 3, 18.0);
+				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
+			}
+		}
+		case 4: // Val de Sageti - rapid fire AoE
+		{
+			new Float:origin[3];
+			pev(id, pev_origin, origin);
+			
+			new Float:dmg = 22.0 + power * 0.6;
+			new hit = 0;
+			
+			for (new i = 1; i <= MaxClients; i++)
+			{
+				if (!is_user_alive(i) || i == id) continue;
+				if (get_user_team(i) == get_user_team(id)) continue;
+				
+				new Float:torigin[3];
+				pev(i, pev_origin, torigin);
+				
+				if (get_distance_f(origin, torigin) < 320.0)
+				{
+					ExecuteHamB(Ham_TakeDamage, i, id, id, dmg, DMG_BULLET);
+					hit++;
+				}
+			}
+			apply_skill_cooldown(id, 4, 28.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Val de Sageti: %.0f dmg | Inamici: %d", dmg, hit);
+		}
+	}
+}
+
+// ======================== SHAMAN - FULGER / VINDECARE ========================
+stock skill_shaman_fulger(id, slot, lvl)
+{
+	new Float:power = float(lvl) * 2.0 + float(g_Player[id][g_INT]) * 1.2;
+	
+	switch (slot)
+	{
+		case 0: // Lecuire (varianta mai puternică)
+		{
+			new heal = 55 + floatround(power);
+			new hp = get_user_health(id);
+			new maxhp = 100 + g_Player[id][g_HP] * 10;
+			
+			for (new i = 0; i < MAX_EQUIP_SLOTS; i++)
+			{
+				new itemid = g_Player[id][g_Equipped][i];
+				if (itemid > 0 && itemid < g_ItemCount)
+					maxhp += g_Items[itemid][ItemHp] + g_Player[id][g_EquippedUpgrade][i] * 3;
+			}
+			
+			set_user_health(id, min(hp + heal, maxhp));
+			apply_skill_cooldown(id, 0, 12.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Lecuire: +%d HP!", heal);
+		}
+		case 1: // Atac Intens
+		{
+			g_AuraActive[id] = true;
+			new Float:dur = 8.5 + (lvl * 0.18);
+			set_user_rendering(id, kRenderFxGlowShell, 255, 220, 50, kRenderNormal, 40);
+			set_task(dur, "RemoveAura", id);
+			apply_skill_cooldown(id, 1, 30.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Atac Intens: +damage (%.1f sec)!", dur);
+		}
+		case 2: // Binecuvantare
+		{
+			g_BlessActive[id] = true;
+			g_BlessAmount[id] = 18.0 + (float(lvl) * 1.4) + (float(g_Player[id][g_INT]) * 0.9);
+			
+			new Float:dur = 10.0 + (lvl * 0.22);
+			set_user_rendering(id, kRenderFxGlowShell, 80, 255, 120, kRenderNormal, 35);
+			set_task(dur, "RemoveBless", id);
+			apply_skill_cooldown(id, 2, 26.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Binecuvantare: +%.0f defense (%.1f sec)!", g_BlessAmount[id], dur);
+		}
+		case 3: // Iutesenie - reset CD
+		{
+			for (new i = 0; i < 5; i++)
+				g_SkillCooldown[id][i] = 0.0;
+			
+			apply_skill_cooldown(id, 3, 50.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Iutesenie: toate cooldown-urile resetate!");
+		}
+		case 4: // Chemarea Fulgerului
+		{
+			new Float:origin[3];
+			pev(id, pev_origin, origin);
+
+			engfunc(EngFunc_MessageBegin, MSG_PVS, get_user_msgid("ScreenFade"), origin, 0);
+			write_short(1<<10);
+			write_short(1<<10);
+			write_short(1<<12);
+			write_byte(200);
+			write_byte(220);
+			write_byte(255);
+			write_byte(200);
+			message_end();
+			
+			new Float:radius = 220.0 + (lvl * 2.5);
+			new stunned = 0;
+			
+			for (new i = 1; i <= MaxClients; i++)
+			{
+				if (!is_user_alive(i) || i == id) continue;
+				if (get_user_team(i) == get_user_team(id)) continue;
+				
+				new Float:torigin[3];
+				pev(i, pev_origin, torigin);
+				
+				if (get_distance_f(origin, torigin) < radius)
+				{
+					if (random_num(1, 100) <= (30 + lvl / 2))
+					{
+						set_pev(i, pev_flags, pev(i, pev_flags) | FL_FROZEN);
+						set_task(1.4 + (lvl * 0.04), "Unfreeze", i);
+						stunned++;
+					}
+					
+					// mic damage de fulger
+					ExecuteHamB(Ham_TakeDamage, i, id, id, 20.0 + power * 0.4, DMG_SHOCK);
+				}
+			}
+			
+			apply_skill_cooldown(id, 4, 30.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Chemarea Fulgerului: flash + stun (%d)!", stunned);
+		}
+	}
+}
+
 
 public RemoveBless(id)
 {
@@ -1703,6 +2332,7 @@ public race_handler(id, menu, item)
 	g_Player[id][g_Race] = race;
 	g_Player[id][g_StatPoints] = 5;
 	g_Player[id][g_SkillPoints] = 3;
+	g_Player[id][g_SkillPath] = PATH_NONE;   // forțează alegerea căii
 	
 	recalc_max_mp(id);
 	g_Player[id][g_MP] = g_Player[id][g_MaxMP];
@@ -1710,9 +2340,62 @@ public race_handler(id, menu, item)
 	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai ales rasa: ^3%s^1!", g_RaceName[race]);
 	save_player(id);
 	
-	// Forward
 	new ret;
 	ExecuteForward(g_fwd_RaceSelected, ret, id, race);
+	
+	menu_destroy(menu);
+	
+	show_path_menu(id);
+	
+	return PLUGIN_HANDLED;
+}
+
+stock show_path_menu(id)
+{
+	if (g_Player[id][g_Race] == RACE_NONE)
+		return;
+	
+	if (g_Player[id][g_SkillPath] != PATH_NONE)
+	{
+		client_print_color(id, print_team_default, "^4[Metin2]^1 Ai deja calea aleasa: ^3%s", 
+			g_PathName[g_Player[id][g_Race]][g_Player[id][g_SkillPath]-1]);
+		return;
+	}
+	
+	new title[64];
+	formatex(title, charsmax(title), "\yAlege Calea - %s", g_RaceName[g_Player[id][g_Race]]);
+	
+	new menu = menu_create(title, "path_handler");
+	
+	new tmp[48];
+	formatex(tmp, charsmax(tmp), "%s", g_PathName[g_Player[id][g_Race]][0]);
+	menu_additem(menu, tmp, "1");
+	
+	formatex(tmp, charsmax(tmp), "%s", g_PathName[g_Player[id][g_Race]][1]);
+	menu_additem(menu, tmp, "2");
+	
+	menu_display(id, menu);
+}
+
+public path_handler(id, menu, item)
+{
+	if (item == MENU_EXIT)
+	{
+		menu_destroy(menu);
+		return PLUGIN_HANDLED;
+	}
+	
+	new data[6];
+	new access, callback;
+	menu_item_getinfo(menu, item, access, data, charsmax(data), _, _, callback);
+	
+	new path = str_to_num(data);
+	g_Player[id][g_SkillPath] = path;
+	
+	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai ales calea: ^3%s^1!", 
+		g_PathName[g_Player[id][g_Race]][path-1]);
+	
+	save_player(id);
 	
 	menu_destroy(menu);
 	return PLUGIN_HANDLED;
@@ -1787,6 +2470,17 @@ public stats_handler(id, menu, item)
 	return PLUGIN_HANDLED;
 }
 
+
+
+stock get_skill_rank(level, output[], len)
+{
+	if (level <= 0) formatex(output, len, "0");
+	else if (level < 20) formatex(output, len, "N%d", level);
+	else if (level < 30) formatex(output, len, "M%d", level - 19);
+	else if (level < 40) formatex(output, len, "G%d", level - 29);
+	else formatex(output, len, "P");
+}
+
 public cmd_skills(id)
 {
 	if (g_Player[id][g_Race] == RACE_NONE)
@@ -1795,11 +2489,21 @@ public cmd_skills(id)
 		return PLUGIN_HANDLED;
 	}
 	
-	new race = g_Player[id][g_Race];
-	new start = (race - 1) * 5;
+	if (g_Player[id][g_SkillPath] == PATH_NONE)
+	{
+		client_print_color(id, print_team_default, "^4[Metin2]^1 Alege mai intai calea de skill-uri!");
+		show_path_menu(id);
+		return PLUGIN_HANDLED;
+	}
 	
-	new title[64];
-	formatex(title, charsmax(title), "\ySkill-uri (%s) - Puncte: %d", g_RaceName[race], g_Player[id][g_SkillPoints]);
+	new race = g_Player[id][g_Race];
+	new path = g_Player[id][g_SkillPath];
+	new start = (race - 1) * 10 + (path - 1) * 5;
+	
+	new title[80];
+	formatex(title, charsmax(title), "\ySkill-uri %s (%s) - Puncte: %d", 
+		g_RaceName[race], g_PathName[race][path-1], g_Player[id][g_SkillPoints]);
+	
 	new menu = menu_create(title, "skills_handler");
 	
 	for (new i = 0; i < 5; i++)
@@ -1820,15 +2524,6 @@ public cmd_skills(id)
 	return PLUGIN_HANDLED;
 }
 
-stock get_skill_rank(level, output[], len)
-{
-	if (level <= 0) formatex(output, len, "0");
-	else if (level < 20) formatex(output, len, "N%d", level);
-	else if (level < 30) formatex(output, len, "M%d", level - 19);
-	else if (level < 40) formatex(output, len, "G%d", level - 29);
-	else formatex(output, len, "P");
-}
-
 public skills_handler(id, menu, item)
 {
 	if (item == MENU_EXIT)
@@ -1846,7 +2541,9 @@ public skills_handler(id, menu, item)
 	if (g_Player[id][g_SkillPoints] <= 0)
 	{
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Nu ai puncte de skill!");
+		// Meniul rămâne deschis – doar re-afișăm
 		menu_destroy(menu);
+		cmd_skills(id);
 		return PLUGIN_HANDLED;
 	}
 	
@@ -1854,6 +2551,7 @@ public skills_handler(id, menu, item)
 	{
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Skill deja Perfect Master!");
 		menu_destroy(menu);
+		cmd_skills(id);
 		return PLUGIN_HANDLED;
 	}
 	
@@ -1866,12 +2564,13 @@ public skills_handler(id, menu, item)
 	
 	save_player(id);
 	
-	// Forward
 	new ret;
 	ExecuteForward(g_fwd_SkillLearned, ret, id, skill_idx, g_Player[id][g_SkillLevel][skill_idx]);
 	
+	// Meniul NU se închide – îl re-creăm
 	menu_destroy(menu);
 	cmd_skills(id);
+	
 	return PLUGIN_HANDLED;
 }
 
