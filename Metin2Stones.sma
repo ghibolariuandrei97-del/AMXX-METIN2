@@ -127,6 +127,8 @@ enum _:StoneData
 new g_Stones[MAX_STONES][StoneData]
 new g_StoneCount
 
+new Float:g_LastHudTime[33]
+
 new const Float:g_StoneMins[3] = STONE_MINS
 new const Float:g_StoneMaxs[3] = STONE_MAXS
 
@@ -414,8 +416,9 @@ public fw_Stone_TakeDamage(victim, inflictor, attacker, Float:damage, damagebits
 	
 	g_Stones[slot][STONE_HP] -= dmg
 	
-	if (random_num(1, 100) <= 30)
+	if (get_gametime() - g_LastHudTime[attacker] >= 0.3)
 	{
+		g_LastHudTime[attacker] = get_gametime()
 		set_hudmessage(255, 255, 0, 0.75, 0.15, 0, 0.02, 1.5, 0.05, 0.1, -1)
 		show_hudmessage(attacker, "- Metin2 Stone HP: %d / %d -", g_Stones[slot][STONE_HP], g_Stones[slot][STONE_MAXHP])
 	}
@@ -438,7 +441,37 @@ public fw_Stone_Think(ent)
 	if (!equal(classname, STONE_CLASSNAME))
 		return
 	
-	set_pev(ent, pev_nextthink, get_gametime() + 1.5)
+	// Anti-stuck: împinge afară orice player prins în bbox-ul pietrei
+	// (previne bug-ul de crash: crouch + cuțit intrat în piatră)
+	new Float:stone_origin[3], Float:player_origin[3]
+	pev(ent, pev_origin, stone_origin)
+	
+	for (new i = 1; i <= MaxClients; i++)
+	{
+		if (!is_user_alive(i))
+			continue
+		
+		pev(i, pev_origin, player_origin)
+		
+		new Float:diff[3]
+		diff[0] = player_origin[0] - stone_origin[0]
+		diff[1] = player_origin[1] - stone_origin[1]
+		diff[2] = player_origin[2] - stone_origin[2]
+		
+		if (diff[0] > g_StoneMins[0] && diff[0] < g_StoneMaxs[0] &&
+			diff[1] > g_StoneMins[1] && diff[1] < g_StoneMaxs[1] &&
+			diff[2] > g_StoneMins[2] && diff[2] < g_StoneMaxs[2])
+		{
+			new Float:push[3]
+			push[0] = player_origin[0] + (diff[0] >= 0.0 ? 40.0 : -40.0)
+			push[1] = player_origin[1] + (diff[1] >= 0.0 ? 40.0 : -40.0)
+			push[2] = player_origin[2] + 10.0
+			
+			set_pev(i, pev_origin, push)
+		}
+	}
+	
+	set_pev(ent, pev_nextthink, get_gametime() + 0.3)
 }
 
 stock destroy_stone(slot, killer)
@@ -451,6 +484,10 @@ stock destroy_stone(slot, killer)
 	
 	if (pev_valid(ent))
 	{
+		// Oprește imediat orice damage/coliziune suplimentară pe entitate
+		set_pev(ent, pev_solid, SOLID_NOT)
+		set_pev(ent, pev_takedamage, DAMAGE_NO)
+		
 		new Float:origin[3]
 		pev(ent, pev_origin, origin)
 		
@@ -466,7 +503,12 @@ stock destroy_stone(slot, killer)
 		write_byte(0)
 		message_end()
 		
-		engfunc(EngFunc_RemoveEntity, ent)
+		// Remove amânat (nu sincron din hook-ul de damage), ca să nu crape
+		// serverul dacă entitatea e ștearsă în timp ce e coliziune activă
+		// pe ea (ex: player blocat înăuntru cu crouch)
+		new data[1]
+		data[0] = ent
+		set_task(0.05, "task_DeferredRemove", 0, data, 1)
 	}
 	
 	give_stone_rewards(killer, level)
@@ -516,6 +558,13 @@ stock give_stone_rewards(id, level)
 // ============================================================
 //                    HELPER FUNCTIONS
 // ============================================================
+
+public task_DeferredRemove(data[1])
+{
+	new ent = data[0]
+	if (pev_valid(ent))
+		engfunc(EngFunc_RemoveEntity, ent)
+}
 
 stock get_stone_slot(ent)
 {
