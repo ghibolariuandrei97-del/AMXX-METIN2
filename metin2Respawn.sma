@@ -2,10 +2,10 @@
 #include <amxmisc>
 #include <reapi>
 #include <fakemeta>
-#include <metin2_api>          
+#include <metin2_api>          // API-ul tău
 
 #define PLUGIN  "Metin2 Auto Respawn"
-#define VERSION "1.0"
+#define VERSION "1.1"
 #define AUTHOR  "Craxor"
 
 #define TASK_RESPAWN_BASE     55100
@@ -161,47 +161,7 @@ stock RespawnInBase(id)
 	
 	g_WaitingRespawn[id] = false;
 	
-	// Folosim ReAPI pentru respawn corect
 	rg_round_respawn(id);
-	
-	// Mută-l la un spawn valid al echipei lui
-	new TeamName:team = get_member(id, m_iTeam);
-	
-	new ent = -1;
-	new Float:origin[3], Float:angles[3];
-	new bool:found = false;
-	
-	while ((ent = rg_find_ent_by_class(ent, "info_player_start")) > 0)  // CT / base
-	{
-		if (team == TEAM_CT || team == TEAM_TERRORIST)
-		{
-			pev(ent, pev_origin, origin);
-			pev(ent, pev_angles, angles);
-			found = true;
-			break;
-		}
-	}
-	
-	// Fallback: dacă nu găsește, încearcă info_player_deathmatch
-	if (!found)
-	{
-		ent = -1;
-		while ((ent = rg_find_ent_by_class(ent, "info_player_deathmatch")) > 0)
-		{
-			pev(ent, pev_origin, origin);
-			pev(ent, pev_angles, angles);
-			found = true;
-			break;
-		}
-	}
-	
-	if (found)
-	{
-		origin[2] += 10.0; // ridică puțin ca să nu se blocheze în podea
-		set_pev(id, pev_origin, origin);
-		set_pev(id, pev_angles, angles);
-		set_pev(id, pev_v_angle, angles);   // ← aici e corect
-	}
 	
 	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai renviat in ^3baza^1!");
 }
