@@ -85,7 +85,7 @@ stock debug_log(iDebugLevel = 0, const szMessage[], any:...)
 #endif
 
 #define PLUGIN  "Metin2Core"
-#define VERSION "1.1"
+#define VERSION "1.2"
 #define AUTHOR  "Craxor"
 
 #define MAX_PLAYERS          32
@@ -268,7 +268,7 @@ public plugin_init()
 	register_plugin(PLUGIN, VERSION, AUTHOR);
 	
 	register_clcmd("say /menu",     "cmd_menu");
-	register_clcmd("say /metin2",   "cmd_menu");
+	register_clcmd("say /metin2",   "cmd_status_motd");
 	register_clcmd("say /stats",    "cmd_stats");
 	register_clcmd("say /statut",   "cmd_stats");
 	register_clcmd("say /skills",   "cmd_skills");
@@ -1408,24 +1408,30 @@ public cmd_reset(id)
 	
 	new level = g_Player[id][g_Level];
 	
-	// Pastreaza Level, XP, Yang, Inventar, Echipament
-	// Reseteaza rasa + stats + skill-uri
+	// ===== PĂSTREAZĂ =====
+	// Level, XP, Yang, Inventar, Echipament → NU se ating!
 	
+	// ===== RESETEAZĂ =====
 	g_Player[id][g_Race] = RACE_NONE;
 	
+	// Stats de bază la 1
 	g_Player[id][g_STR] = 1;
 	g_Player[id][g_HP]  = 1;
 	g_Player[id][g_DEX] = 1;
 	g_Player[id][g_INT] = 1;
 	
-	// Puncte totale ca la un caracter nou de acelasi level
+	// Dă înapoi TOATE punctele pe care le-ar fi avut la acel nivel
+	// (5 la start + 1 pe fiecare level up)
 	g_Player[id][g_StatPoints]  = 5 + (level - 1);
 	g_Player[id][g_SkillPoints] = 3 + (level - 1);
 	
+	// Resetează toate skill-urile
 	for (new i = 0; i < MAX_SKILLS; i++)
 		g_Player[id][g_SkillLevel][i] = 0;
 	
-	// Opreste buff-uri active
+	g_Player[id][g_SkillPath] = PATH_NONE;
+	
+	// Oprește buff-urile active
 	g_AuraActive[id] = false;
 	g_ReflectActive[id] = false;
 	g_AmbushActive[id] = false;
@@ -1435,19 +1441,17 @@ public cmd_reset(id)
 	g_ResistAmount[id] = 0.0;
 	g_PierceAmount[id] = 0.0;
 	g_BlessAmount[id] = 0.0;
-
-	g_Player[id][g_SkillPath] = PATH_NONE;
 	
 	remove_task(id);
 	if (is_user_alive(id))
 		set_user_rendering(id);
 	
 	recalc_max_mp(id);
-	
 	save_player(id);
 	
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Caracter resetat! Level: ^3%d^1 | Stat Points: ^3%d^1 | Skill Points: ^3%d", level, g_Player[id][g_StatPoints], g_Player[id][g_SkillPoints]);
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Alege noua rasa cu ^3/menu^1.");
+	client_print_color(id, print_team_default, "^4[Metin2]^1 Caracter resetat! Level: ^3%d^1 | Stat Points: ^3%d^1 | Skill Points: ^3%d", 
+		level, g_Player[id][g_StatPoints], g_Player[id][g_SkillPoints]);
+	client_print_color(id, print_team_default, "^4[Metin2]^1 Itemele si Yang-ul au fost pastrate. Alege noua rasa cu ^3/menu^1.");
 	
 	return PLUGIN_HANDLED;
 }
@@ -2330,9 +2334,15 @@ public race_handler(id, menu, item)
 	
 	new race = str_to_num(data);
 	g_Player[id][g_Race] = race;
-	g_Player[id][g_StatPoints] = 5;
-	g_Player[id][g_SkillPoints] = 3;
-	g_Player[id][g_SkillPath] = PATH_NONE;   // forțează alegerea căii
+	g_Player[id][g_SkillPath] = PATH_NONE;
+
+	// Dă punctele de start DOAR dacă e caracter nou (level 1 și 0 puncte)
+	// Altfel (după /reset) păstrează punctele calculate în cmd_reset
+	if (g_Player[id][g_Level] <= 1 && g_Player[id][g_StatPoints] <= 0)
+	{
+		g_Player[id][g_StatPoints]  = 5;
+		g_Player[id][g_SkillPoints] = 3;
+	}
 	
 	recalc_max_mp(id);
 	g_Player[id][g_MP] = g_Player[id][g_MaxMP];
@@ -2600,16 +2610,7 @@ public inv_handler(id, menu, item)
 	
 	switch (str_to_num(data))
 	{
-		case 1:
-		{
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Echipament:");
-			client_print_color(id, print_team_default, "Arma: %s +%d", get_item_name(g_Player[id][g_Equipped][SLOT_WEAPON]), g_Player[id][g_EquippedUpgrade][SLOT_WEAPON]);
-			client_print_color(id, print_team_default, "Armura: %s +%d", get_item_name(g_Player[id][g_Equipped][SLOT_ARMOR]), g_Player[id][g_EquippedUpgrade][SLOT_ARMOR]);
-			client_print_color(id, print_team_default, "Coif: %s +%d", get_item_name(g_Player[id][g_Equipped][SLOT_HELMET]), g_Player[id][g_EquippedUpgrade][SLOT_HELMET]);
-			client_print_color(id, print_team_default, "Scut: %s +%d", get_item_name(g_Player[id][g_Equipped][SLOT_SHIELD]), g_Player[id][g_EquippedUpgrade][SLOT_SHIELD]);
-			client_print_color(id, print_team_default, "Papuci: %s +%d", get_item_name(g_Player[id][g_Equipped][SLOT_SHOES]), g_Player[id][g_EquippedUpgrade][SLOT_SHOES]);
-			client_print_color(id, print_team_default, "Bijuterie: %s +%d", get_item_name(g_Player[id][g_Equipped][SLOT_JEWEL]), g_Player[id][g_EquippedUpgrade][SLOT_JEWEL]);
-		}
+		case 1:client_equipment_motd(id);
 		case 2: show_equip_from_inv(id);
 		case 3: show_unequip(id);
 		case 4: use_potion_menu(id);
@@ -2617,6 +2618,128 @@ public inv_handler(id, menu, item)
 	
 	menu_destroy(menu);
 	return PLUGIN_HANDLED;
+}
+
+public client_equipment_motd(id)
+{
+    static motd[1024];
+    new len = 0;
+
+    // Header
+    len = formatex(motd[len], charsmax(motd) - len,
+        "<html><body bgcolor=#1a1a1a text=#e0e0e0 style='font-family:Arial;font-size:13px;margin:8px'>");
+    
+    len += formatex(motd[len], charsmax(motd) - len,
+        "<b style='color:#4fc3f7;font-size:15px'>[Metin2] Echipament</b><br><br>");
+
+    // Arma
+    len += formatex(motd[len], charsmax(motd) - len,
+        "<b style='color:#81c784'>Arma:</b> %s <span style='color:#ffd54f'>+%d</span><br>",
+        get_item_name(g_Player[id][g_Equipped][SLOT_WEAPON]),
+        g_Player[id][g_EquippedUpgrade][SLOT_WEAPON]);
+
+    // Armura
+    len += formatex(motd[len], charsmax(motd) - len,
+        "<b style='color:#81c784'>Armura:</b> %s <span style='color:#ffd54f'>+%d</span><br>",
+        get_item_name(g_Player[id][g_Equipped][SLOT_ARMOR]),
+        g_Player[id][g_EquippedUpgrade][SLOT_ARMOR]);
+
+    // Coif
+    len += formatex(motd[len], charsmax(motd) - len,
+        "<b style='color:#81c784'>Coif:</b> %s <span style='color:#ffd54f'>+%d</span><br>",
+        get_item_name(g_Player[id][g_Equipped][SLOT_HELMET]),
+        g_Player[id][g_EquippedUpgrade][SLOT_HELMET]);
+
+    // Scut
+    len += formatex(motd[len], charsmax(motd) - len,
+        "<b style='color:#81c784'>Scut:</b> %s <span style='color:#ffd54f'>+%d</span><br>",
+        get_item_name(g_Player[id][g_Equipped][SLOT_SHIELD]),
+        g_Player[id][g_EquippedUpgrade][SLOT_SHIELD]);
+
+    // Papuci
+    len += formatex(motd[len], charsmax(motd) - len,
+        "<b style='color:#81c784'>Papuci:</b> %s <span style='color:#ffd54f'>+%d</span><br>",
+        get_item_name(g_Player[id][g_Equipped][SLOT_SHOES]),
+        g_Player[id][g_EquippedUpgrade][SLOT_SHOES]);
+
+    // Bijuterie
+    len += formatex(motd[len], charsmax(motd) - len,
+        "<b style='color:#81c784'>Bijuterie:</b> %s <span style='color:#ffd54f'>+%d</span>",
+        get_item_name(g_Player[id][g_Equipped][SLOT_JEWEL]),
+        g_Player[id][g_EquippedUpgrade][SLOT_JEWEL]);
+
+    // Închidere
+    len += formatex(motd[len], charsmax(motd) - len, "</body></html>");
+
+    show_motd(id, motd, "[Metin2] Echipament");
+}
+
+// Calculează STR total (base + iteme + upgrade)
+stock get_total_str(id)
+{
+	new total = g_Player[id][g_STR];
+	
+	for (new i = 0; i < MAX_EQUIP_SLOTS; i++)
+	{
+		new itemid = g_Player[id][g_Equipped][i];
+		if (itemid > 0 && itemid < g_ItemCount)
+		{
+			total += g_Items[itemid][ItemStr];
+			total += g_Player[id][g_EquippedUpgrade][i];   // +1 per nivel de upgrade
+		}
+	}
+	return total;
+}
+
+// Calculează HP Stat total (base + iteme + upgrade)
+stock get_total_hp(id)
+{
+	new total = g_Player[id][g_HP];
+	
+	for (new i = 0; i < MAX_EQUIP_SLOTS; i++)
+	{
+		new itemid = g_Player[id][g_Equipped][i];
+		if (itemid > 0 && itemid < g_ItemCount)
+		{
+			total += g_Items[itemid][ItemHp];
+			total += g_Player[id][g_EquippedUpgrade][i] * 2;   // upgrade dă mai mult la HP
+		}
+	}
+	return total;
+}
+
+// Calculează DEX total
+stock get_total_dex(id)
+{
+	new total = g_Player[id][g_DEX];
+	
+	for (new i = 0; i < MAX_EQUIP_SLOTS; i++)
+	{
+		new itemid = g_Player[id][g_Equipped][i];
+		if (itemid > 0 && itemid < g_ItemCount)
+		{
+			total += g_Items[itemid][ItemDex];
+			total += g_Player[id][g_EquippedUpgrade][i];
+		}
+	}
+	return total;
+}
+
+// Calculează INT total
+stock get_total_int(id)
+{
+	new total = g_Player[id][g_INT];
+	
+	for (new i = 0; i < MAX_EQUIP_SLOTS; i++)
+	{
+		new itemid = g_Player[id][g_Equipped][i];
+		if (itemid > 0 && itemid < g_ItemCount)
+		{
+			total += g_Items[itemid][ItemInt];
+			total += g_Player[id][g_EquippedUpgrade][i];
+		}
+	}
+	return total;
 }
 
 stock get_item_name(itemid)
@@ -3011,6 +3134,80 @@ public shop_handler(id, menu, item)
 	save_player(id);
 	
 	menu_destroy(menu);
+	return PLUGIN_HANDLED;
+}
+
+public cmd_status_motd(id)
+{
+	if (!is_user_connected(id))
+		return PLUGIN_HANDLED;
+	
+	if (g_Player[id][g_Race] == RACE_NONE)
+	{
+		client_print_color(id, print_team_default, "^4[Metin2]^1 Alege mai intai o rasa cu ^3/menu^1!");
+		return PLUGIN_HANDLED;
+	}
+	
+	static motd[1100];
+	new len = 0;
+	
+	new name[32];
+	get_user_name(id, name, charsmax(name));
+	
+	new needed = get_xp_needed(g_Player[id][g_Level]);
+	
+	// Header
+	len = formatex(motd[len], charsmax(motd) - len,
+		"<html><body bgcolor=#111111 text=#e0e0e0 style='font-family:Arial;font-size:13px;margin:6px'>");
+	
+	len += formatex(motd[len], charsmax(motd) - len,
+		"<b style='color:#ffcc00;font-size:15px'>[Metin2] Status Character</b><br><br>");
+	
+	// Nume + Rasă + Level
+	len += formatex(motd[len], charsmax(motd) - len,
+		"<b style='color:#4fc3f7'>Nume:</b> %s<br>", name);
+	
+	len += formatex(motd[len], charsmax(motd) - len,
+		"<b style='color:#4fc3f7'>Rasa:</b> %s<br>", g_RaceName[g_Player[id][g_Race]]);
+	
+	len += formatex(motd[len], charsmax(motd) - len,
+		"<b style='color:#4fc3f7'>Level:</b> <span style='color:#ffd54f'>%d</span><br>", g_Player[id][g_Level]);
+	
+	// XP exact (current / needed)
+	len += formatex(motd[len], charsmax(motd) - len,
+		"<b style='color:#4fc3f7'>XP:</b> %d / %d<br><br>", g_Player[id][g_XP], needed);
+	
+	// Stats totale (cu iteme)
+	len += formatex(motd[len], charsmax(motd) - len,
+		"<b style='color:#81c784'>=== Stats (cu iteme) ===</b><br>");
+	
+	len += formatex(motd[len], charsmax(motd) - len,
+		"<b>STR:</b> <span style='color:#ff8a65'>%d</span> &nbsp;&nbsp; ", get_total_str(id));
+	
+	len += formatex(motd[len], charsmax(motd) - len,
+		"<b>HP:</b> <span style='color:#ff8a65'>%d</span><br>", get_total_hp(id));
+	
+	len += formatex(motd[len], charsmax(motd) - len,
+		"<b>DEX:</b> <span style='color:#ff8a65'>%d</span> &nbsp;&nbsp; ", get_total_dex(id));
+	
+	len += formatex(motd[len], charsmax(motd) - len,
+		"<b>INT:</b> <span style='color:#ff8a65'>%d</span><br><br>", get_total_int(id));
+	
+	// Info extra utile
+	len += formatex(motd[len], charsmax(motd) - len,
+		"<b style='color:#81c784'>Yang:</b> %d<br>", g_Player[id][g_Yang]);
+	
+	len += formatex(motd[len], charsmax(motd) - len,
+		"<b style='color:#81c784'>MP:</b> %d / %d<br>", g_Player[id][g_MP], g_Player[id][g_MaxMP]);
+	
+	len += formatex(motd[len], charsmax(motd) - len,
+		"<b style='color:#81c784'>Puncte Stat:</b> %d &nbsp;|&nbsp; <b>Puncte Skill:</b> %d<br>",
+		g_Player[id][g_StatPoints], g_Player[id][g_SkillPoints]);
+	
+	// Închidere
+	len += formatex(motd[len], charsmax(motd) - len, "</body></html>");
+	
+	show_motd(id, motd, "[Metin2] Status Character");
 	return PLUGIN_HANDLED;
 }
 
