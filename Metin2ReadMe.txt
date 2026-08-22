@@ -11,8 +11,7 @@
 2. Orice plugin extern care folosește API-ul Metin2 (metin2_api.inc) TREBUIE
    să fie încărcat DUPĂ metin2Core.amxx.
 
-3. Dacă schimbați MAX_SKILLS sau structura PlayerData, recomandat să schimbați
-   și numele vault-ului (ex: "metin2_rpg_v2") ca să evitați date corupte.
+3. Setati cvar-ul sv_maxspeed din amxx.cfg ca anumite puteri de speed sa functioneze.
 
 --------------------------------------------------------------------------------
 [1] DESPRE MOD
