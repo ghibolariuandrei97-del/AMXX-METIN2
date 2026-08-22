@@ -305,8 +305,8 @@ public plugin_init()
 	
 	register_event("DeathMsg", "OnDeath", "a");
 	
-	// Block name change
 	register_forward(FM_ClientUserInfoChanged, "OnClientUserInfoChanged");
+	register_forward(FM_ServerDeactivate, "OnServerDeactivate");
 	
 	g_HudSync = CreateHudSyncObj();
 	
@@ -735,6 +735,17 @@ public client_disconnected(id)
 	reset_player(id);
 
 	debug_log(5, "Client_DIsconnected() apelat" );
+}
+
+public OnServerDeactivate()
+{
+	for (new id = 1; id <= MaxClients; id++)
+	{
+		if (is_user_connected(id))
+			save_player(id);
+	}
+
+	debug_log(5, "OnServerDeactivate() apelat - toti jucatorii au fost salvati inainte de schimbarea hartii");
 }
 
 stock reset_player(id)
