@@ -5,7 +5,7 @@
  * ============================================================================
  * Ranguri Metin2:
  * 1. [GO]     Game Owner
- * 2. [DEV]    Game Developer
+ * 2. [DEV]    Developer
  * 3. [SA]     Server Admin
  * 4. [GA]     Game Administrator
  * 5. [SGM]    Super Game Master
@@ -27,8 +27,8 @@
 #include <metin2_api>
 
 #define PLUGIN  "Admin Hierarchy Metin2"
-#define VERSION "1.0"
-#define AUTHOR  "AI"
+#define VERSION "1.1"
+#define AUTHOR  "ClauAI"
 
 #define MAX_RANKS     32
 #define MAX_MOTD_LEN  1535
@@ -77,7 +77,7 @@ public LoadRanks()
             fputs(f, "; =====================================================^n^n");
 
             // De la cel mai mare la cel mai mic
-            fputs(f, "#FF0000   ^"[GO] Game Owner^"            ^"abcdefghijklmnopqrstu^"^n");
+            fputs(f, "#FF0000   ^"[GO] Game Owner^"              ^"abcdefghijklmnopqrstu^"^n");
             fputs(f, "#FF4500   ^"[DEV] Developer^"            ^"abcdefghijklmnopqrst^"^n");
             fputs(f, "#FF8C00   ^"[SA] Server Admin^"          ^"abcdefghijklmnopqrs^"^n");
             fputs(f, "#FFD700   ^"[GA] Game Administrator^"    ^"abcdefghijklmnopqr^"^n");
@@ -330,6 +330,11 @@ public Hook_Say(id)
         cmd_who(id);
         return PLUGIN_HANDLED;
     }
+
+    // Comenzile care incep cu '/' sunt lasate sa treaca mai departe catre alte plugin-uri
+    // (ex: /check, /restore) - nu le trimitem ca mesaj normal de chat.
+    if (args[0] == '/')
+        return PLUGIN_CONTINUE;
 
     BroadcastChat(id, args, false);
     return PLUGIN_HANDLED;
