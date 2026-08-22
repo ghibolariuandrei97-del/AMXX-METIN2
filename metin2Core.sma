@@ -1057,27 +1057,71 @@ public Task_HUD()
 		if (!is_user_connected(id) || is_user_bot(id))
 			continue;
 		
-		// Dacă nu are rasă aleasă → mesaj de bun venit
-		if (g_Player[id][g_Race] == RACE_NONE)
+		// Determină pe cine să arătăm informațiile
+		new target = id;
+		
+		// Dacă e mort și stă pe cineva în spectator
+		if (!is_user_alive(id))
 		{
-			set_hudmessage(255, 200, 0, -1.0, 0.90, 0, 0.0, 1.1, 0.0, 0.0, -1);
-			ShowSyncHudMsg(id, g_HudSync, "[Metin2] Scrie /menu sau /metin2 ca sa-ti alegi caracterul si sa incepi jocul!");
+			new spec = pev(id, pev_iuser2);
+			
+			if (is_user_alive(spec) && is_user_connected(spec))
+			{
+				target = spec;		// arată info-ul celui pe care îl urmărește
+			}
+			else
+			{
+				// Nu urmărește pe nimeni valid → mesaj simplu
+				set_hudmessage(255, 180, 0, -1.0, 0.90, 0, 0.0, 1.1, 0.0, 0.0, -1);
+				ShowSyncHudMsg(id, g_HudSync, "[Metin2] Esti mort. Alege un jucator pentru a vedea statusul lui.");
+				continue;
+			}
+		}
+		
+		// Dacă ținta nu are rasă
+		if (g_Player[target][g_Race] == RACE_NONE)
+		{
+			if (target == id)
+			{
+				set_hudmessage(255, 200, 0, -1.0, 0.90, 0, 0.0, 1.1, 0.0, 0.0, -1);
+				ShowSyncHudMsg(id, g_HudSync, "[Metin2] Scrie /menu sau /metin2 ca sa-ti alegi caracterul si sa incepi jocul!");
+			}
+			else
+			{
+				set_hudmessage(255, 180, 0, -1.0, 0.90, 0, 0.0, 1.1, 0.0, 0.0, -1);
+				ShowSyncHudMsg(id, g_HudSync, "[Metin2] Jucatorul urmarit nu are rasa aleasa.");
+			}
 			continue;
 		}
 		
-		// Jucătorul are rasă → HUD normal
-		new needed = get_xp_needed(g_Player[id][g_Level]);
-		new Float:pct = (float(g_Player[id][g_XP]) / float(needed)) * 100.0;
+		// HUD normal (propriu sau al celui urmărit)
+		new needed = get_xp_needed(g_Player[target][g_Level]);
+		new Float:pct = 0.0;
 		
-		set_hudmessage(0, 255, 100, -1.0, 0.90, 0, 0.0, 1.1, 0.0, 0.0, -1);
-		ShowSyncHudMsg(id, g_HudSync, "[Metin2] %s | Lvl %d | XP %.1f%% | Yang %d | MP %d/%d | Stat %d | SkillP %d",
-			g_RaceName[g_Player[id][g_Race]],
-			g_Player[id][g_Level],
+		if (needed > 0)
+			pct = (float(g_Player[target][g_XP]) / float(needed)) * 100.0;
+		
+		// Culoare diferită dacă e spectator
+		if (target == id)
+			set_hudmessage(0, 255, 100, -1.0, 0.90, 0, 0.0, 1.1, 0.0, 0.0, -1);		// verde = propriu
+		else
+			set_hudmessage(100, 200, 255, -1.0, 0.90, 0, 0.0, 1.1, 0.0, 0.0, -1);		// albastru = spectator
+		
+		new prefix[32];
+		if (target != id)
+			formatex(prefix, charsmax(prefix), "[SPEC] ");
+		else
+			prefix[0] = EOS;
+		
+		ShowSyncHudMsg(id, g_HudSync, "%s[Metin2] %s | Lvl %d | XP %.1f%% | Yang %d | MP %d/%d | Stats Points %d | Skill Points %d",
+			prefix,
+			g_RaceName[g_Player[target][g_Race]],
+			g_Player[target][g_Level],
 			pct,
-			g_Player[id][g_Yang],
-			g_Player[id][g_MP], g_Player[id][g_MaxMP],
-			g_Player[id][g_StatPoints],
-			g_Player[id][g_SkillPoints]);
+			g_Player[target][g_Yang],
+			g_Player[target][g_MP], g_Player[target][g_MaxMP],
+			g_Player[target][g_StatPoints],
+			g_Player[target][g_SkillPoints]);
 	}
 }
 
