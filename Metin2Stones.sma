@@ -17,8 +17,8 @@
 //                      CONFIGURARE GENERALĂ
 // ============================================================
 
-#define MAX_STONES              8
-#define SPAWN_INTERVAL          45.0
+#define MAX_STONES              5
+#define SPAWN_INTERVAL          60.0
 #define SPAWN_CHANCE            70
 #define MIN_DISTANCE_PLAYERS    180.0
 #define MIN_DISTANCE_STONES     250.0
@@ -34,7 +34,7 @@
 //                   LEVEL 1 - Metin of the Plains
 // ============================================================
 #define STONE_L1_HP             1200
-#define STONE_L1_XP             40
+#define STONE_L1_XP             200
 #define STONE_L1_YANG           800
 #define STONE_L1_NAME           "Metin of the Plains"
 #define STONE_L1_SPAWN_CHANCE   40
@@ -47,7 +47,7 @@
 //                   LEVEL 2 - Metin of the Forest
 // ============================================================
 #define STONE_L2_HP             2800
-#define STONE_L2_XP             90
+#define STONE_L2_XP             300
 #define STONE_L2_YANG           1800
 #define STONE_L2_NAME           "Metin of the Forest"
 #define STONE_L2_SPAWN_CHANCE   30
@@ -60,7 +60,7 @@
 //                   LEVEL 3 - Metin of the Mountain
 // ============================================================
 #define STONE_L3_HP             5500
-#define STONE_L3_XP             180
+#define STONE_L3_XP             400
 #define STONE_L3_YANG           3500
 #define STONE_L3_NAME           "Metin of the Mountain"
 #define STONE_L3_SPAWN_CHANCE   18
@@ -73,7 +73,7 @@
 //                   LEVEL 4 - Metin of the Desert
 // ============================================================
 #define STONE_L4_HP             9500
-#define STONE_L4_XP             320
+#define STONE_L4_XP             500
 #define STONE_L4_YANG           6000
 #define STONE_L4_NAME           "Metin of the Desert"
 #define STONE_L4_SPAWN_CHANCE   9
@@ -86,7 +86,7 @@
 //                   LEVEL 5 - Metin of the Heaven
 // ============================================================
 #define STONE_L5_HP             16000
-#define STONE_L5_XP             550
+#define STONE_L5_XP             1000
 #define STONE_L5_YANG           10000
 #define STONE_L5_NAME           "Metin of the Heaven"
 #define STONE_L5_SPAWN_CHANCE   3
@@ -98,8 +98,8 @@
 // ============================================================
 //                   BOSS METIN
 // ============================================================
-#define STONE_BOSS_HP           45000
-#define STONE_BOSS_XP           1500
+#define STONE_BOSS_HP           50000
+#define STONE_BOSS_XP           5000
 #define STONE_BOSS_YANG         25000
 #define STONE_BOSS_NAME         "Boss Metin"
 #define STONE_BOSS_SPAWN_CHANCE 1
@@ -416,7 +416,8 @@ public fw_Stone_TakeDamage(victim, inflictor, attacker, Float:damage, damagebits
 	
 	if (random_num(1, 100) <= 30)
 	{
-		client_print(attacker, print_center, "Metin HP: %d / %d", g_Stones[slot][STONE_HP], g_Stones[slot][STONE_MAXHP])
+		set_hudmessage(255, 255, 0, 0.75, 0.15, 0, 0.02, 1.5, 0.05, 0.1, -1)
+		show_hudmessage(attacker, "- Metin2 Stone HP: %d / %d -", g_Stones[slot][STONE_HP], g_Stones[slot][STONE_MAXHP])
 	}
 	
 	if (g_Stones[slot][STONE_HP] <= 0)
@@ -426,7 +427,6 @@ public fw_Stone_TakeDamage(victim, inflictor, attacker, Float:damage, damagebits
 	
 	return HAM_SUPERCEDE
 }
-
 public fw_Stone_Think(ent)
 {
 	if (!pev_valid(ent))
