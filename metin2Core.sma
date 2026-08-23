@@ -69,8 +69,8 @@ stock debug_log(iDebugLevel = 0, const szMessage[], any:...)
 			get_mapname(szMap, charsmax(szMap));
 			new Players[32], Num;
 			get_players(Players, Num);
-			server_print("[DEBUG, SysTime: %i, Map: %s, Players: %i] %s", get_systime(), szMap, Num, Frm);
-			client_print(0, print_console, "[DEBUG, SysTime: %i, Map: %s, Players: %i] %s", get_systime(), szMap, Num, Frm);
+			//server_print("[DEBUG, SysTime: %i, Map: %s, Players: %i] %s", get_systime(), szMap, Num, Frm);
+			//client_print(0, print_console, "[DEBUG, SysTime: %i, Map: %s, Players: %i] %s", get_systime(), szMap, Num, Frm);
 			new buff[120];
 			formatex(buff, charsmax(buff), "[DEBUG, SysTime: %i, Map: %s, Players: %i] %s", get_systime(), szMap, Num, Frm);
 			write_file(szDebugFileLocation, buff);
