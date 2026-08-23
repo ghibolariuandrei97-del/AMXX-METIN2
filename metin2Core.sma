@@ -6,6 +6,9 @@
 ================================================================================*/
 
 
+// 1=Debug Oprit , 0=Debug Pornit
+#define DEBUG_LOGS_OFF 1
+//
 
 #include <amxmodx>
 #include <amxmisc>
@@ -15,74 +18,6 @@
 #include <fakemeta>
 #include <hamsandwich>
 #include <fun>
-
-// 1=Debug Oprit , 0=Debug Pornit
-#define DEBUG_LOGS_OFF 1
-null_func(){}
-
-static stock const szDebugFileLocation[] = "addons/amxmodx/data/metin2logs.txt";
-
-#if DEBUG_LOGS_OFF
-	#define debug_log(%1)	null_func()
-#else
-stock debug_log(iDebugLevel = 0, const szMessage[], any:...)
-{
-	static Frm[128];
-	vformat(Frm, charsmax(Frm), szMessage, 3);
-
-	switch (iDebugLevel)
-	{
-		case 1:
-		{
-			server_print("[DEBUG] %s", Frm);
-			client_print(0, print_console, "[DEBUG] %s", Frm);
-		}
-		case 2:
-		{
-			server_print("[DEBUG] %s", Frm);
-			client_print(0, print_console, "[DEBUG] %s", Frm);
-			new buff[120];
-			formatex(buff, charsmax(buff), "[DEBUG] %s", Frm);
-			write_file(szDebugFileLocation, buff);
-		}
-		case 3:
-		{
-			server_print("[DEBUG, SysTime: %i] %s", get_systime(), Frm);
-			client_print(0, print_console, "[DEBUG, SysTime: %i] %s", get_systime(), Frm);
-			new buff[120];
-			formatex(buff, charsmax(buff), "[DEBUG, SysTime: %i] %s", get_systime(), Frm);
-			write_file(szDebugFileLocation, buff);
-		}
-		case 4:
-		{
-			new szMap[32];
-			get_mapname(szMap, charsmax(szMap));
-			server_print("[DEBUG, SysTime: %i, Map: %s] %s", get_systime(), szMap, Frm);
-			client_print(0, print_console, "[DEBUG, SysTime: %i, Map: %s] %s", get_systime(), szMap, Frm);
-			new buff[120];
-			formatex(buff, charsmax(buff), "[DEBUG, SysTime: %i, Map: %s] %s", get_systime(), szMap, Frm);
-			write_file(szDebugFileLocation, buff);
-		}
-		case 5:
-		{
-			new szMap[32];
-			get_mapname(szMap, charsmax(szMap));
-			new Players[32], Num;
-			get_players(Players, Num);
-			//server_print("[DEBUG, SysTime: %i, Map: %s, Players: %i] %s", get_systime(), szMap, Num, Frm);
-			//client_print(0, print_console, "[DEBUG, SysTime: %i, Map: %s, Players: %i] %s", get_systime(), szMap, Num, Frm);
-			new buff[120];
-			formatex(buff, charsmax(buff), "[DEBUG, SysTime: %i, Map: %s, Players: %i] %s", get_systime(), szMap, Num, Frm);
-			write_file(szDebugFileLocation, buff);
-		}
-		default:
-		{
-			client_print(0, print_console, Frm);
-			null_func();
-		}
-	}
-}
-#endif
 
 #define PLUGIN  "Metin2Core"
 #define VERSION "1.2"
@@ -160,6 +95,7 @@ enum _:ItemStruct
 };
 
 new g_Player[MAX_PLAYERS + 1][PlayerData];
+new bool:g_DataLoaded[MAX_PLAYERS + 1];
 new g_Vault = INVALID_HANDLE;
 new g_HudSync;
 new Float:g_SkillCooldown[MAX_PLAYERS + 1][5];
@@ -235,6 +171,51 @@ new g_fwd_UpgradeFail;
 new g_fwd_RaceSelected;
 new g_fwd_StatAllocated;
 new g_fwd_SkillLearned;
+
+null_func(){}
+
+static stock const szDebugFileLocation[] = "addons/amxmodx/data/metin2debug.txt";
+
+#if DEBUG_LOGS_OFF
+	#define debug_log(%1)		null_func()
+	#define debug_log_user(%1)	null_func()
+#else
+stock debug_log(const szMessage[], any:...)
+{
+	static Frm[128];
+	vformat(Frm, charsmax(Frm), szMessage, 2);   // <-- aici era greșeala
+	new szMap[32];
+	get_mapname(szMap, charsmax(szMap));
+	new Players[32], Num;
+	get_players(Players, Num);
+	new buff[120];
+	formatex(buff, charsmax(buff), "[DEBUG, SysTime: %i, Map: %s, Players: %i] %s", get_systime(), szMap, Num, Frm);
+	write_file(szDebugFileLocation, buff);
+	null_func();
+}
+
+stock debug_log_user(id, const szMessage[], any:...)
+{
+	static Frm[128];
+	vformat(Frm, charsmax(Frm), szMessage, 3);
+	new szMap[32];
+	get_mapname(szMap, charsmax(szMap));
+	new Players[32], Num;
+	get_players(Players, Num);
+	new szName[32];
+	get_user_name(id, szName, charsmax(szName));
+	new buff[200];
+	formatex(buff, charsmax(buff), "[DEBUG, SysTime: %i, Map: %s, Players: %i, User: %s, Level: %d, XP: %d, Yang: %d, Race: %d] %s",
+		get_systime(), szMap, Num, szName,
+		g_Player[id][g_Level], g_Player[id][g_XP], g_Player[id][g_Yang], g_Player[id][g_Race],
+		Frm);
+
+	write_file(szDebugFileLocation, buff);
+	null_func();
+}
+
+#endif
+
 
 public plugin_natives()
 {
@@ -331,6 +312,8 @@ public plugin_init()
 	
 	set_task(1.0, "Task_HUD", _, _, _, "b");
 	set_task(2.0, "Task_ManaRegen", _, _, _, "b");
+
+	debug_log( "Plugin_Init() Initializat cu Succes - Vault deschis cu succes!");
 }
 
 public plugin_end()
@@ -348,6 +331,8 @@ public plugin_end()
 	DestroyForward(g_fwd_RaceSelected);
 	DestroyForward(g_fwd_StatAllocated);
 	DestroyForward(g_fwd_SkillLearned);
+
+	debug_log( "Plugin_End() initiazliat cu succs, vault deschis");
 }
 
 // ======================== ITEM SYSTEM (DYNAMIC) ========================
@@ -408,7 +393,7 @@ stock RegisterItemInternal(const name[], type, req_level, race_req, str, hp, dex
 	g_Items[item_id][ItemPotionType] = potion_type;
 
 	g_ItemCount++;
-	debug_log( 5, "g_itemCound %i", g_ItemCount); 
+	debug_log(  "g_itemCound %i", g_ItemCount); 
 	return item_id;
 }
 
@@ -418,7 +403,7 @@ public _m2_register_item(plugin, params)
 	if (g_ItemCount >= MAX_ITEMS)
 	{
 		log_amx("[Metin2] Nu se mai pot inregistra iteme! Limita de %d a fost atinsa.", MAX_ITEMS);
-		debug_log( 5, "Limita de inregistrare iteme a fost atinsa");
+		debug_log( "Limita de inregistrare iteme a fost atinsa");
 		return -1;
 	}
 
@@ -454,7 +439,7 @@ public _m2_register_item(plugin, params)
 
 	g_ItemCount++;
 
-	debug_log(5, "[Metin2] Item inregistrat: '%s' (ID %d, Type %d, Price %d)", szName, item_id, type, price);
+	debug_log("[Metin2] Item inregistrat: '%s' (ID %d, Type %d, Price %d)", szName, item_id, type, price);
 	return item_id;
 }
 
@@ -687,13 +672,13 @@ public OnClientUserInfoChanged(id)
 	
 	get_user_info(id, "name", newname, charsmax(newname));
 
-	debug_log( 5, "OnClientUserInfoChanged a fost apelat, numele: %s -- A fost si blocat? uitativa in contiuare", oldname);
+	debug_log("OnClientUserInfoChanged a fost apelat, numele: %s -- A fost si blocat? uitativa in contiuare", oldname);
 	
 	if (!equal(oldname, newname) && oldname[0])
 	{
 		set_user_info(id, "name", oldname);
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Schimbarea numelui este blocata pe acest server!");
-		debug_log( 5, "OnClientUserInfoChanged: Nume a fost blocat! %s", newname);
+		debug_log_user(id, "OnClientUserInfoChanged: Nume a fost blocat! din %s in %s",oldname, newname);
 		return FMRES_HANDLED;
 	}
 	
@@ -708,7 +693,7 @@ public client_putinserver(id)
 	load_player(id);
 	
 	set_task(3.0, "Task_WelcomeMsg", id);
-	debug_log( 5, "Client_putinserver() a fost apelat, reset_player(), load_players() si set_task(TaslWelcomeMEssage) vor fi apelate!");
+	debug_log_user( id, "Client_putinserver() a fost apelat, reset_player(), load_players() si set_task(TaslWelcomeMEssage) vor fi apelate!");
 }
 
 public Task_WelcomeMsg(id)
@@ -717,7 +702,7 @@ public Task_WelcomeMsg(id)
 		return;
 	
 
-	debug_log(5, " public Task_WelcomeMEssage a fost apelat!" );
+	debug_log_user(id, " public Task_WelcomeMEssage a fost apelat!" );
 	if (g_Player[id][g_Race] == RACE_NONE)
 	{
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Bun venit! Alege-ti rasa cu ^3/menu^1.");
@@ -726,6 +711,7 @@ public Task_WelcomeMsg(id)
 	{
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Date incarcate. Level: ^3%d^1 | Yang: ^3%d", g_Player[id][g_Level], g_Player[id][g_Yang]);
 	}
+
 }
 
 public client_disconnected(id)
@@ -734,7 +720,7 @@ public client_disconnected(id)
 	save_player(id);
 	reset_player(id);
 
-	debug_log(5, "Client_DIsconnected() apelat" );
+	debug_log_user(id, "Client_DIsconnected() apelat" );
 }
 
 public OnServerDeactivate()
@@ -745,12 +731,13 @@ public OnServerDeactivate()
 			save_player(id);
 	}
 
-	debug_log(5, "OnServerDeactivate() apelat - toti jucatorii au fost salvati inainte de schimbarea hartii");
+	debug_log( "OnServerDeactivate() apelat - toti jucatorii au fost salvati inainte de schimbarea hartii");
 }
 
 stock reset_player(id)
 {
 	g_Player[id][g_Level] = 1;
+	g_DataLoaded[id] = false;
 	g_Player[id][g_XP] = 0;
 	g_Player[id][g_Yang] = 1000;
 	g_Player[id][g_Race] = RACE_NONE;
@@ -799,7 +786,7 @@ stock reset_player(id)
 		set_user_rendering(id);
 
 
-	debug_log(5, "Reset_Player() apelat cu succes" );
+	debug_log_user(id, "Reset_Player() apelat cu succes" );
 }
 
 // ======================== PLAYER LOAD / SAVE (RESTORED FROM WORKING 0.2) ========================
@@ -812,9 +799,8 @@ stock load_player(id)
 	
 	new timestamp;
 	new size = nvault_get_array(g_Vault, key, g_Player[id], PlayerData, timestamp);
-	debug_log(3, "LOAD → key=%s | size=%d | Level=%d | XP=%d | Yang=%d | Race=%d", key, size, g_Player[id][g_Level], g_Player[id][g_XP], g_Player[id][g_Yang], g_Player[id][g_Race]);
+	debug_log_user(id, "Load_Player: LOAD → key=%s | size=%d | Level=%d | XP=%d | Yang=%d | Race=%d", key, size, g_Player[id][g_Level], g_Player[id][g_XP], g_Player[id][g_Yang], g_Player[id][g_Race]);
 	
-	debug_log(5, " public Task_WelcomeMEssage a fost apelat!" );
 
 	if (size <= 0)
 	{
@@ -826,11 +812,13 @@ stock load_player(id)
 		g_Player[id][g_INT] = 1;
 		g_Player[id][g_MP] = 50;
 		g_Player[id][g_MaxMP] = 50;
+		debug_log_user(id, "load_player() if size is smaller or equal with 0");
 	}
 	else
 	{
 		recalc_max_mp(id);
 	}
+	g_DataLoaded[id] = true;
 }
 
 stock save_player(id)
@@ -838,6 +826,12 @@ stock save_player(id)
 	// Ne asigurăm că ID-ul este in intervalul corect
 	if (id < 1 || id > MaxClients)
 		return;
+
+	if (!g_DataLoaded[id])
+	{
+		debug_log_user(id, "SAVE_player() BLOCAT - g_DataLoaded[id] e false, datele nu au fost inca incarcate");
+		return;
+	}
     
 	new name[32], key[48];
 	get_user_name(id, name, charsmax(name));
@@ -847,7 +841,7 @@ stock save_player(id)
         
 	formatex(key, charsmax(key), "m2_%s", name);
 	nvault_set_array(g_Vault, key, g_Player[id], PlayerData);
-	debug_log(5, "SAVE → key=%s | Level=%d | XP=%d | Yang=%d | Race=%d | size=%d", key, g_Player[id][g_Level], g_Player[id][g_XP], g_Player[id][g_Yang], g_Player[id][g_Race], PlayerData);
+	debug_log_user(id, "SAVE_player() called");
 }
 
 
@@ -901,6 +895,7 @@ stock add_xp(id, amount)
 	}
 	
 	// ← ADAUGĂ ASTA
+	debug_log_user(id, "Add_XP stock apelat");
 	save_player(id);
 }
 
@@ -940,6 +935,8 @@ public OnDeath()
 	save_player(killer);
 	
 	client_print_color(killer, print_team_default, "^4[Metin2]^1 +%d XP | +%d Yang%s", xp, yang, headshot ? " ^3(Headshot)" : "");
+	debug_log_user(victim, "OnDeah() Victim Id");
+	debug_log_user(killer, "OnDeah() Killer Id");
 	
 	// Forward kill
 	new ret;
@@ -990,6 +987,8 @@ public OnPlayerSpawn(id)
 	}
 	
 	set_user_maxspeed(id, speed);
+
+	debug_log_user(id, "OnPlayerSpawn()");
 }
 
 public OnTakeDamage(victim, inflictor, attacker, Float:damage, damagebits)
@@ -1507,6 +1506,8 @@ public cmd_reset(id)
 	client_print_color(id, print_team_default, "^4[Metin2]^1 Caracter resetat! Level: ^3%d^1 | Stat Points: ^3%d^1 | Skill Points: ^3%d", 
 		level, g_Player[id][g_StatPoints], g_Player[id][g_SkillPoints]);
 	client_print_color(id, print_team_default, "^4[Metin2]^1 Itemele si Yang-ul au fost pastrate. Alege noua rasa cu ^3/menu^1.");
+
+	debug_log_user(id, "cmd reset()");
 	
 	return PLUGIN_HANDLED;
 }
