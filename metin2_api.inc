@@ -566,3 +566,60 @@ stock bool:m2_skill_belongs_to_race(skill_idx, race, path = 0)
 	
 	return (skill_idx >= start && skill_idx < start + 5);
 }
+
+// ======================== NATIVES NOI (v1.3) ========================
+
+// Slot-uri echipament: 0=Weapon, 1=Armor, 2=Helmet, 3=Shield, 4=Shoes, 5=Jewel
+
+// Returnează item ID echipat pe slot (0 daca e gol)
+native m2_get_user_equipped(id, slot);
+
+// Returnează nivelul de upgrade al itemului echipat pe slot
+native m2_get_user_equipped_upgrade(id, slot);
+
+// Numărul de iteme din inventar
+native m2_get_user_inventory_count(id);
+
+// Item ID din slotul de inventar (0-based)
+native m2_get_user_inventory_item(id, inv_slot);
+
+// Upgrade-ul itemului din slotul de inventar
+native m2_get_user_inventory_upgrade(id, inv_slot);
+
+// 1 dacă jucătorul are itemul (echipat SAU în inventar)
+native m2_user_has_item(id, itemid);
+
+// Copiază numele itemului în buffer
+native m2_get_item_name(itemid, buffer[], len);
+
+// Tip item: 1=Weapon, 2=Armor, 3=Helmet, 4=Shield, 5=Shoes, 6=Jewel, 7=Potion
+native m2_get_item_type(itemid);
+
+// Prețul itemului din magazin
+native m2_get_item_price(itemid);
+
+// Câte iteme sunt înregistrate în total (inclusiv ID 0 = Gol)
+native m2_get_item_count();
+
+// Dă un item în inventar. upgrade opțional (default 0). Returnează 1 la succes
+native m2_give_item(id, itemid, upgrade = 0);
+
+// Scoate prima apariție a itemului din inventar (nu din echipat). Returnează 1 dacă a fost scos
+native m2_remove_item(id, itemid);
+
+// Stats totale (base + iteme + upgrade)
+native m2_get_total_str(id);
+native m2_get_total_hp(id);
+native m2_get_total_dex(id);
+native m2_get_total_int(id);
+
+
+// ======================== FORWARDS NOI (v1.3) ========================
+
+// Când un jucător cumpără un item din magazin
+// id = jucător, itemid = ID item, price = preț plătit
+forward m2_item_bought(id, itemid, price);
+
+// Când un jucător folosește o poțiune
+// id = jucător, itemid = ID item, potion_type = 1 (HP) sau 2 (MP)
+forward m2_item_used(id, itemid, potion_type);
