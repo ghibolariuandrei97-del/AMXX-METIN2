@@ -131,23 +131,17 @@ UpdatePlayerStats(id)
 
 public RG_TakeDamage(const id, pevInflictor, pevAttacker, Float:flDamage, bitsDamageType)
 {
-	// ---- Fall Damage block ----
+	// ---- Fall Damage block (fără SUPERCEDE ca să nu mai dea eroare) ----
 	if (get_pcvar_num(g_pCvarNoFallDamage) && (bitsDamageType & DMG_FALL))
 	{
-		SetHookChainArg(4, ATYPE_FLOAT, 0.0)
-		return HC_SUPERCEDE
+		SetHookChainArg(4, ATYPE_FLOAT, 0.0)   // damage = 0
+		return HC_CONTINUE                     // important! nu mai folosim SUPERCEDE
 	}
 
 	// ---- Damage Indicator ----
 	if (flDamage > 0.0 && is_user_connected(pevAttacker) && pevAttacker != id)
 	{
-		// Arătăm damage-ul atacatorului
 		ShowDamageIndicator(pevAttacker, floatround(flDamage))
-	}
-
-	if (flDamage > 0.0 && is_user_connected(id))
-	{
-		ShowDamageIndicator(id, floatround(flDamage)) // arată și victimei
 	}
 
 	return HC_CONTINUE
