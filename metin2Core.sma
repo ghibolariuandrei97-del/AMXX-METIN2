@@ -3488,21 +3488,21 @@ public cmd_status_motd(id)
 	copy(sho, charsmax(sho), get_item_name(g_Player[id][g_Equipped][SLOT_SHOES]));
 	copy(jwl, charsmax(jwl), get_item_name(g_Player[id][g_Equipped][SLOT_JEWEL]));
 	
-	// Compact HTML - minim tags
+	// Culori luminoase, contrast bun pe fundal inchis
 	formatex(motd, charsmax(motd),
-		"<html><body bgcolor=#111 text=#ddd style='font:12px Arial;margin:4px'>\
-		<b style='color:#fc0'>[Metin2] Status</b><br>\
-		<font color=#4fc3f7>%s</font> | %s | Lv <font color=#ffd54f>%d</font><br>\
-		XP: %d/%d | Yang: %d<br>\
-		MP: %d/%d | SP: %d | SkP: %d<br>\
-		STR:%d HP:%d DEX:%d INT:%d<br><br>\
-		<b style='color:#81c784'>Echipament</b><br>\
-		Arma: %s +%d<br>\
-		Armura: %s +%d<br>\
-		Coif: %s +%d<br>\
-		Scut: %s +%d<br>\
-		Papuci: %s +%d<br>\
-		Bijuterie: %s +%d\
+		"<html><body bgcolor=#0a0a12 text=#ffffff style='font:13px Arial;margin:6px'>\
+		<b style='color:#ffd700'>[Metin2] Status</b><br>\
+		<font color=#00e5ff>%s</font> | <font color=#b39ddb>%s</font> | Lv <font color=#ffeb3b>%d</font><br>\
+		XP: <font color=#81c784>%d</font>/%d | Yang: <font color=#ffd54f>%d</font><br>\
+		MP: <font color=#64b5f6>%d</font>/%d | SP: %d | SkP: %d<br>\
+		STR:<font color=#ef5350>%d</font> HP:<font color=#ef5350>%d</font> DEX:<font color=#ef5350>%d</font> INT:<font color=#ef5350>%d</font><br><br>\
+		<b style='color:#69f0ae'>Echipament</b><br>\
+		Arma: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
+		Armura: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
+		Coif: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
+		Scut: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
+		Papuci: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
+		Bijuterie: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font>\
 		</body></html>",
 		name,
 		g_RaceName[g_Player[id][g_Race]],
