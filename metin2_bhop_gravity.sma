@@ -58,21 +58,8 @@ public plugin_init()
 	RegisterHookChain(RG_CBasePlayer_TakeDamage, "RG_TakeDamage")
 	RegisterHookChain(RG_CBasePlayer_PreThink, "RG_PlayerPreThink")
 
-	// Comenzi
-	register_clcmd("say /bhopinfo", "Cmd_BhopInfo")
-	register_clcmd("say_team /bhopinfo", "Cmd_BhopInfo")
-	register_clcmd("say /info", "Cmd_BhopInfo")
-	register_clcmd("say_team /info", "Cmd_BhopInfo")
-
 	g_iHudSync = CreateHudSyncObj()
 }
-
-public plugin_cfg()
-{
-	server_cmd("sv_airaccelerate 100")
-	server_cmd("sv_maxspeed 9999")
-}
-
 // ======================== METIN2 LEVEL UP ========================
 
 public m2_level_up(id, new_level)
@@ -250,32 +237,6 @@ public client_disconnected(id)
 
 	g_fLastDamageTime[id] = 0.0
 }
-
-// ======================== COMANDA /info & /bhopinfo ========================
-
-public Cmd_BhopInfo(id)
-{
-	if (!is_user_connected(id))
-		return PLUGIN_HANDLED
-
-	new level = get_user_m2_level(id)
-	new Float:grav = g_fPlayerGravity[id]
-	new Float:spd  = g_fPlayerMaxSpeed[id]
-
-	client_print(id, print_chat, "========== [Metin2 Bhop Info] ==========")
-	client_print(id, print_chat, "Level: %d", level)
-	client_print(id, print_chat, "Gravity: %.3f (mai mic = sari mai sus)", grav)
-	client_print(id, print_chat, "MaxSpeed baza: %.0f", spd)
-	client_print(id, print_chat, "BunnyHop: %s | AutoBhop: %s", 
-		get_pcvar_num(g_pCvarBhopEnable) ? "ON" : "OFF",
-		get_pcvar_num(g_pCvarBhopAuto) ? "ON" : "OFF")
-	client_print(id, print_chat, "Fall Damage: %s", get_pcvar_num(g_pCvarNoFallDamage) ? "BLOCTAT" : "ACTIV")
-	client_print(id, print_chat, "Speed Gain per hop: x%.2f", get_pcvar_float(g_pCvarBhopSpeedGain))
-	client_print(id, print_chat, "======================================")
-
-	return PLUGIN_HANDLED
-}
-
 // ======================== DAMAGE INDICATOR ========================
 
 ShowDamageIndicator(attacker, damage)
