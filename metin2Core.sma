@@ -1674,7 +1674,7 @@ public cmd_reset(id)
 	// ===== RESETEAZĂ =====
 	g_Player[id][g_Race] = RACE_NONE;
 	
-	// Stats de bază la 1
+	// Stats de bază la 1 (minim)
 	g_Player[id][g_STR] = 1;
 	g_Player[id][g_HP]  = 1;
 	g_Player[id][g_DEX] = 1;
@@ -1692,21 +1692,55 @@ public cmd_reset(id)
 	g_Player[id][g_SkillPath] = PATH_NONE;
 	
 	// Oprește buff-urile active
-	g_AuraActive[id] = false;
-	g_ReflectActive[id] = false;
-	g_AmbushActive[id] = false;
-	g_ResistActive[id] = false;
-	g_PierceActive[id] = false;
-	g_BlessActive[id] = false;
-	g_ResistAmount[id] = 0.0;
-	g_PierceAmount[id] = 0.0;
-	g_BlessAmount[id] = 0.0;
+	g_AuraActive[id]     = false;
+	g_ReflectActive[id]  = false;
+	g_AmbushActive[id]   = false;
+	g_ResistActive[id]   = false;
+	g_PierceActive[id]   = false;
+	g_BlessActive[id]    = false;
+	g_ResistAmount[id]   = 0.0;
+	g_PierceAmount[id]   = 0.0;
+	g_BlessAmount[id]    = 0.0;
 	
 	remove_task(id);
 	if (is_user_alive(id))
 		set_user_rendering(id);
 	
 	recalc_max_mp(id);
+	
+	// === IMPORTANT: recalculează HP + Speed LIVE dacă e în viață ===
+	if (is_user_alive(id))
+	{
+		// HP = 100 + (HP_stat * 10) + bonus iteme
+		new hp = 100 + (g_Player[id][g_HP] * 10);
+		
+		for (new i = 0; i < MAX_EQUIP_SLOTS; i++)
+		{
+			new itemid = g_Player[id][g_Equipped][i];
+			if (itemid > 0 && itemid < g_ItemCount)
+			{
+				new upg = g_Player[id][g_EquippedUpgrade][i];
+				hp += g_Items[itemid][ItemHp] + (upg * 3);
+			}
+		}
+		
+		set_user_health(id, hp);
+		
+		// Speed = 250 + bonus iteme
+		new Float:speed = 250.0;
+		for (new i = 0; i < MAX_EQUIP_SLOTS; i++)
+		{
+			new itemid = g_Player[id][g_Equipped][i];
+			if (itemid > 0 && itemid < g_ItemCount)
+				speed += float(g_Items[itemid][ItemSpeed] + g_Player[id][g_EquippedUpgrade][i] * 2);
+		}
+		
+		set_user_maxspeed(id, speed);
+		
+		// MP full după recalc
+		g_Player[id][g_MP] = g_Player[id][g_MaxMP];
+	}
+	
 	save_player(id);
 	
 	client_print_color(id, print_team_default, "^4[Metin2]^1 Caracter resetat! Level: ^3%d^1 | Stat Points: ^3%d^1 | Skill Points: ^3%d", 
@@ -2800,7 +2834,7 @@ public cmd_skills(id)
 		formatex(info, charsmax(info), "%d", start + i);
 		menu_additem(menu, tmp, info);
 	}
-	menu_additem(menu, "\rInapoi", "0");
+	menu_additem(menu, "\rInapoi", "999");
 	
 	menu_display(id, menu);
 	return PLUGIN_HANDLED;
@@ -2821,7 +2855,7 @@ public skills_handler(id, menu, item)
 	new skill_idx = str_to_num(data);
 	menu_destroy(menu);
 	
-	if (skill_idx == 0)
+	if (skill_idx == 999)          // ← schimbat din 0
 	{
 		cmd_menu(id);
 		return PLUGIN_HANDLED;
@@ -2853,9 +2887,10 @@ public skills_handler(id, menu, item)
 	new ret;
 	ExecuteForward(g_fwd_SkillLearned, ret, id, skill_idx, g_Player[id][g_SkillLevel][skill_idx]);
 	
-	cmd_skills(id); // re-open (nu se inchide)
+	cmd_skills(id); // re-open
 	return PLUGIN_HANDLED;
 }
+
 
 // Inventar, Upgrade, Shop, Binds
 
