@@ -20,7 +20,7 @@
 #include <fun>
 
 #define PLUGIN  "Metin2Core"
-#define VERSION "1.2"
+#define VERSION "1.4"
 #define AUTHOR  "Craxor"
 
 #define MAX_PLAYERS          32
@@ -171,6 +171,8 @@ new g_fwd_UpgradeFail;
 new g_fwd_RaceSelected;
 new g_fwd_StatAllocated;
 new g_fwd_SkillLearned;
+new g_fwd_ItemBought;
+new g_fwd_ItemUsed;
 
 null_func(){}
 
@@ -242,6 +244,24 @@ public plugin_natives()
 	register_native("set_user_m2_int",    "_set_user_m2_int");
 	register_native("set_user_m2_mp",     "_set_user_m2_mp");
 	register_native("set_user_m2_maxmp",  "_set_user_m2_maxmp");
+	
+	// Item / Inventory natives
+	register_native("m2_get_user_equipped",         "_m2_get_user_equipped");
+	register_native("m2_get_user_equipped_upgrade", "_m2_get_user_equipped_upgrade");
+	register_native("m2_get_user_inventory_count",  "_m2_get_user_inventory_count");
+	register_native("m2_get_user_inventory_item",   "_m2_get_user_inventory_item");
+	register_native("m2_get_user_inventory_upgrade","_m2_get_user_inventory_upgrade");
+	register_native("m2_user_has_item",             "_m2_user_has_item");
+	register_native("m2_get_item_name",             "_m2_get_item_name");
+	register_native("m2_get_item_type",             "_m2_get_item_type");
+	register_native("m2_get_item_price",            "_m2_get_item_price");
+	register_native("m2_get_item_count",            "_m2_get_item_count");
+	register_native("m2_give_item",                 "_m2_give_item");
+	register_native("m2_remove_item",               "_m2_remove_item");
+	register_native("m2_get_total_str",             "_m2_get_total_str");
+	register_native("m2_get_total_hp",              "_m2_get_total_hp");
+	register_native("m2_get_total_dex",             "_m2_get_total_dex");
+	register_native("m2_get_total_int",             "_m2_get_total_int");
 }
 
 public plugin_init()
@@ -306,6 +326,8 @@ public plugin_init()
 	g_fwd_RaceSelected   = CreateMultiForward("m2_race_selected", ET_IGNORE, FP_CELL, FP_CELL); // id, race
 	g_fwd_StatAllocated  = CreateMultiForward("m2_stat_allocated", ET_IGNORE, FP_CELL, FP_CELL); // id, stat_type (1=STR,2=HP,3=DEX,4=INT)
 	g_fwd_SkillLearned   = CreateMultiForward("m2_skill_learned", ET_IGNORE, FP_CELL, FP_CELL, FP_CELL); // id, skill_idx, new_level
+	g_fwd_ItemBought     = CreateMultiForward("m2_item_bought", ET_IGNORE, FP_CELL, FP_CELL, FP_CELL); // id, itemid, price
+	g_fwd_ItemUsed       = CreateMultiForward("m2_item_used", ET_IGNORE, FP_CELL, FP_CELL, FP_CELL); // id, itemid, potion_type (1=HP,2=MP)
 	
 	// Inregistreaza itemele default (ID-uri 0-15 pastrate pentru compatibilitate salvari)
 	RegisterDefaultItems();
@@ -331,6 +353,8 @@ public plugin_end()
 	DestroyForward(g_fwd_RaceSelected);
 	DestroyForward(g_fwd_StatAllocated);
 	DestroyForward(g_fwd_SkillLearned);
+	DestroyForward(g_fwd_ItemBought);
+	DestroyForward(g_fwd_ItemUsed);
 
 	debug_log( "Plugin_End() initiazliat cu succs, vault deschis");
 }
@@ -659,6 +683,185 @@ public _set_user_m2_maxmp(plugin, params)
 
 	save_player(id);
 	return 1;
+}
+
+// ======================== ITEM / INVENTORY NATIVES ========================
+
+public _m2_get_user_equipped(plugin, params)
+{
+	new id = get_param(1);
+	new slot = get_param(2);
+	if (!is_user_connected(id) || slot < 0 || slot >= MAX_EQUIP_SLOTS)
+		return 0;
+	return g_Player[id][g_Equipped][slot];
+}
+
+public _m2_get_user_equipped_upgrade(plugin, params)
+{
+	new id = get_param(1);
+	new slot = get_param(2);
+	if (!is_user_connected(id) || slot < 0 || slot >= MAX_EQUIP_SLOTS)
+		return 0;
+	return g_Player[id][g_EquippedUpgrade][slot];
+}
+
+public _m2_get_user_inventory_count(plugin, params)
+{
+	new id = get_param(1);
+	if (!is_user_connected(id)) return 0;
+	return g_Player[id][g_InventoryCount];
+}
+
+public _m2_get_user_inventory_item(plugin, params)
+{
+	new id = get_param(1);
+	new inv_slot = get_param(2);
+	if (!is_user_connected(id) || inv_slot < 0 || inv_slot >= g_Player[id][g_InventoryCount])
+		return 0;
+	return g_Player[id][g_Inventory][inv_slot];
+}
+
+public _m2_get_user_inventory_upgrade(plugin, params)
+{
+	new id = get_param(1);
+	new inv_slot = get_param(2);
+	if (!is_user_connected(id) || inv_slot < 0 || inv_slot >= g_Player[id][g_InventoryCount])
+		return 0;
+	return g_Player[id][g_InventoryUpgrade][inv_slot];
+}
+
+// Returns 1 if player has the item equipped OR in inventory
+public _m2_user_has_item(plugin, params)
+{
+	new id = get_param(1);
+	new itemid = get_param(2);
+	if (!is_user_connected(id) || itemid <= 0 || itemid >= g_ItemCount)
+		return 0;
+	
+	// Check equipped
+	for (new i = 0; i < MAX_EQUIP_SLOTS; i++)
+	{
+		if (g_Player[id][g_Equipped][i] == itemid)
+			return 1;
+	}
+	
+	// Check inventory
+	for (new i = 0; i < g_Player[id][g_InventoryCount]; i++)
+	{
+		if (g_Player[id][g_Inventory][i] == itemid)
+			return 1;
+	}
+	return 0;
+}
+
+public _m2_get_item_name(plugin, params)
+{
+	new itemid = get_param(1);
+	new len = get_param(3);
+	if (itemid <= 0 || itemid >= g_ItemCount)
+	{
+		set_string(2, "Gol", len);
+		return 0;
+	}
+	set_string(2, g_Items[itemid][ItemName], len);
+	return 1;
+}
+
+public _m2_get_item_type(plugin, params)
+{
+	new itemid = get_param(1);
+	if (itemid <= 0 || itemid >= g_ItemCount) return 0;
+	return g_Items[itemid][ItemType];
+}
+
+public _m2_get_item_price(plugin, params)
+{
+	new itemid = get_param(1);
+	if (itemid <= 0 || itemid >= g_ItemCount) return 0;
+	return g_Items[itemid][ItemPrice];
+}
+
+public _m2_get_item_count(plugin, params)
+{
+	return g_ItemCount;
+}
+
+// Give item to inventory. Returns 1 on success, 0 on fail (full inv / invalid)
+public _m2_give_item(plugin, params)
+{
+	new id = get_param(1);
+	new itemid = get_param(2);
+	new upgrade = get_param(3);
+	
+	if (!is_user_connected(id) || itemid <= 0 || itemid >= g_ItemCount)
+		return 0;
+	if (g_Player[id][g_InventoryCount] >= MAX_INVENTORY)
+		return 0;
+	if (upgrade < 0) upgrade = 0;
+	if (upgrade > MAX_UPGRADE) upgrade = MAX_UPGRADE;
+	
+	new idx = g_Player[id][g_InventoryCount];
+	g_Player[id][g_Inventory][idx] = itemid;
+	g_Player[id][g_InventoryUpgrade][idx] = upgrade;
+	g_Player[id][g_InventoryCount]++;
+	save_player(id);
+	return 1;
+}
+
+// Remove first occurrence of itemid from inventory (not equipped). Returns 1 if removed.
+public _m2_remove_item(plugin, params)
+{
+	new id = get_param(1);
+	new itemid = get_param(2);
+	
+	if (!is_user_connected(id) || itemid <= 0)
+		return 0;
+	
+	for (new i = 0; i < g_Player[id][g_InventoryCount]; i++)
+	{
+		if (g_Player[id][g_Inventory][i] == itemid)
+		{
+			for (new j = i; j < g_Player[id][g_InventoryCount] - 1; j++)
+			{
+				g_Player[id][g_Inventory][j] = g_Player[id][g_Inventory][j + 1];
+				g_Player[id][g_InventoryUpgrade][j] = g_Player[id][g_InventoryUpgrade][j + 1];
+			}
+			g_Player[id][g_Inventory][g_Player[id][g_InventoryCount] - 1] = 0;
+			g_Player[id][g_InventoryUpgrade][g_Player[id][g_InventoryCount] - 1] = 0;
+			g_Player[id][g_InventoryCount]--;
+			save_player(id);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+public _m2_get_total_str(plugin, params)
+{
+	new id = get_param(1);
+	if (!is_user_connected(id)) return 0;
+	return get_total_str(id);
+}
+
+public _m2_get_total_hp(plugin, params)
+{
+	new id = get_param(1);
+	if (!is_user_connected(id)) return 0;
+	return get_total_hp(id);
+}
+
+public _m2_get_total_dex(plugin, params)
+{
+	new id = get_param(1);
+	if (!is_user_connected(id)) return 0;
+	return get_total_dex(id);
+}
+
+public _m2_get_total_int(plugin, params)
+{
+	new id = get_param(1);
+	if (!is_user_connected(id)) return 0;
+	return get_total_int(id);
 }
 
 // ======================== NAME CHANGE BLOCK ========================
@@ -1123,11 +1326,14 @@ public Task_HUD()
 		else
 			prefix[0] = EOS;
 		
-		ShowSyncHudMsg(id, g_HudSync, "%s[Metin2] %s | Lvl %d | XP %.1f%% | Yang %d | MP %d/%d | Stats Points %d | Skill Points %d",
+		new hp = is_user_alive(target) ? get_user_health(target) : 0;
+		
+		ShowSyncHudMsg(id, g_HudSync, "%s[Metin2] %s | Lvl %d | XP %.1f%% | HP %d | Yang %d | MP %d/%d | SP %d | SkP %d",
 			prefix,
 			g_RaceName[g_Player[target][g_Race]],
 			g_Player[target][g_Level],
 			pct,
+			hp,
 			g_Player[target][g_Yang],
 			g_Player[target][g_MP], g_Player[target][g_MaxMP],
 			g_Player[target][g_StatPoints],
@@ -2327,6 +2533,7 @@ public cmd_menu(id)
 	menu_additem(menu, "Fierar (Upgrade)", "5");
 	menu_additem(menu, "Magazin", "6");
 	menu_additem(menu, "Ghid Bind-uri", "7");
+	menu_setprop(menu, MPROP_EXIT, MEXIT_ALL);
 	menu_display(id, menu);
 	return PLUGIN_HANDLED;
 }
@@ -2344,6 +2551,7 @@ public menu_handler(id, menu, item)
 	menu_item_getinfo(menu, item, access, data, charsmax(data), name, charsmax(name), callback);
 	
 	new key = str_to_num(data);
+	menu_destroy(menu);
 	
 	switch (key)
 	{
@@ -2356,7 +2564,6 @@ public menu_handler(id, menu, item)
 		case 7: cmd_binds(id);
 	}
 	
-	menu_destroy(menu);
 	return PLUGIN_HANDLED;
 }
 
@@ -2488,6 +2695,7 @@ public cmd_stats(id)
 	menu_additem(menu, tmp, "3");
 	formatex(tmp, charsmax(tmp), "INT: %d  [+]", g_Player[id][g_INT]);
 	menu_additem(menu, tmp, "4");
+	menu_additem(menu, "\rInapoi", "0");
 	
 	menu_display(id, menu);
 	return PLUGIN_HANDLED;
@@ -2501,18 +2709,26 @@ public stats_handler(id, menu, item)
 		return PLUGIN_HANDLED;
 	}
 	
-	if (g_Player[id][g_StatPoints] <= 0)
-	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Nu ai puncte de statut!");
-		menu_destroy(menu);
-		return PLUGIN_HANDLED;
-	}
-	
 	new data[6];
 	new access, callback;
 	menu_item_getinfo(menu, item, access, data, charsmax(data), _, _, callback);
 	
 	new key = str_to_num(data);
+	menu_destroy(menu);
+	
+	if (key == 0)
+	{
+		cmd_menu(id);
+		return PLUGIN_HANDLED;
+	}
+	
+	if (g_Player[id][g_StatPoints] <= 0)
+	{
+		client_print_color(id, print_team_default, "^4[Metin2]^1 Nu ai puncte de statut!");
+		cmd_stats(id);
+		return PLUGIN_HANDLED;
+	}
+	
 	g_Player[id][g_StatPoints]--;
 	
 	switch (key)
@@ -2531,8 +2747,7 @@ public stats_handler(id, menu, item)
 	new ret;
 	ExecuteForward(g_fwd_StatAllocated, ret, id, key);
 	
-	menu_destroy(menu);
-	cmd_stats(id);
+	cmd_stats(id); // re-open menu (nu se inchide)
 	return PLUGIN_HANDLED;
 }
 
@@ -2585,6 +2800,7 @@ public cmd_skills(id)
 		formatex(info, charsmax(info), "%d", start + i);
 		menu_additem(menu, tmp, info);
 	}
+	menu_additem(menu, "\rInapoi", "0");
 	
 	menu_display(id, menu);
 	return PLUGIN_HANDLED;
@@ -2603,12 +2819,17 @@ public skills_handler(id, menu, item)
 	menu_item_getinfo(menu, item, access, data, charsmax(data), _, _, callback);
 	
 	new skill_idx = str_to_num(data);
+	menu_destroy(menu);
+	
+	if (skill_idx == 0)
+	{
+		cmd_menu(id);
+		return PLUGIN_HANDLED;
+	}
 	
 	if (g_Player[id][g_SkillPoints] <= 0)
 	{
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Nu ai puncte de skill!");
-		// Meniul rămâne deschis – doar re-afișăm
-		menu_destroy(menu);
 		cmd_skills(id);
 		return PLUGIN_HANDLED;
 	}
@@ -2616,7 +2837,6 @@ public skills_handler(id, menu, item)
 	if (g_Player[id][g_SkillLevel][skill_idx] >= 40)
 	{
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Skill deja Perfect Master!");
-		menu_destroy(menu);
 		cmd_skills(id);
 		return PLUGIN_HANDLED;
 	}
@@ -2633,10 +2853,7 @@ public skills_handler(id, menu, item)
 	new ret;
 	ExecuteForward(g_fwd_SkillLearned, ret, id, skill_idx, g_Player[id][g_SkillLevel][skill_idx]);
 	
-	// Meniul NU se închide – îl re-creăm
-	menu_destroy(menu);
-	cmd_skills(id);
-	
+	cmd_skills(id); // re-open (nu se inchide)
 	return PLUGIN_HANDLED;
 }
 
@@ -2649,6 +2866,7 @@ public cmd_inventar(id)
 	menu_additem(menu, "Echipeaza din inventar", "2");
 	menu_additem(menu, "Dezbraca slot", "3");
 	menu_additem(menu, "Foloseste Lichior HP/MP", "4");
+	menu_additem(menu, "\rInapoi", "0");
 	menu_display(id, menu);
 	return PLUGIN_HANDLED;
 }
@@ -2663,16 +2881,18 @@ public inv_handler(id, menu, item)
 	
 	new data[6];
 	menu_item_getinfo(menu, item, _, data, charsmax(data), _, _, _);
+	new key = str_to_num(data);
+	menu_destroy(menu);
 	
-	switch (str_to_num(data))
+	switch (key)
 	{
-		case 1:client_equipment_motd(id);
+		case 0: cmd_menu(id);
+		case 1: client_equipment_motd(id); //cmd_inventar(id); // re-open after MOTD
 		case 2: show_equip_from_inv(id);
 		case 3: show_unequip(id);
 		case 4: use_potion_menu(id);
 	}
 	
-	menu_destroy(menu);
 	return PLUGIN_HANDLED;
 }
 
@@ -2824,6 +3044,7 @@ stock show_equip_from_inv(id)
 			menu_additem(menu, tmp, info);
 		}
 	}
+	menu_additem(menu, "\rInapoi", "999");
 	
 	menu_display(id, menu);
 }
@@ -2839,13 +3060,20 @@ public equip_handler(id, menu, item)
 	new data[6];
 	menu_item_getinfo(menu, item, _, data, charsmax(data), _, _, _);
 	new inv_slot = str_to_num(data);
+	menu_destroy(menu);
+	
+	if (inv_slot == 999)
+	{
+		cmd_inventar(id);
+		return PLUGIN_HANDLED;
+	}
 	
 	new itemid = g_Player[id][g_Inventory][inv_slot];
 	new upg = g_Player[id][g_InventoryUpgrade][inv_slot];
 	
 	if (itemid <= 0 || itemid >= g_ItemCount)
 	{
-		menu_destroy(menu);
+		show_equip_from_inv(id);
 		return PLUGIN_HANDLED;
 	}
 	
@@ -2861,7 +3089,7 @@ public equip_handler(id, menu, item)
 	
 	if (equip_slot == -1)
 	{
-		menu_destroy(menu);
+		show_equip_from_inv(id);
 		return PLUGIN_HANDLED;
 	}
 	
@@ -2886,7 +3114,7 @@ public equip_handler(id, menu, item)
 	new ret;
 	ExecuteForward(g_fwd_ItemEquipped, ret, id, itemid, equip_slot);
 	
-	menu_destroy(menu);
+	show_equip_from_inv(id); // re-open
 	return PLUGIN_HANDLED;
 }
 
@@ -2899,6 +3127,7 @@ stock show_unequip(id)
 	menu_additem(menu, "Scut", "3");
 	menu_additem(menu, "Papuci", "4");
 	menu_additem(menu, "Bijuterie", "5");
+	menu_additem(menu, "\rInapoi", "999");
 	menu_display(id, menu);
 }
 
@@ -2913,18 +3142,25 @@ public unequip_handler(id, menu, item)
 	new data[6];
 	menu_item_getinfo(menu, item, _, data, charsmax(data), _, _, _);
 	new slot = str_to_num(data);
+	menu_destroy(menu);
+	
+	if (slot == 999)
+	{
+		cmd_inventar(id);
+		return PLUGIN_HANDLED;
+	}
 	
 	if (g_Player[id][g_Equipped][slot] == 0)
 	{
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Slot gol!");
-		menu_destroy(menu);
+		show_unequip(id);
 		return PLUGIN_HANDLED;
 	}
 	
 	if (g_Player[id][g_InventoryCount] >= MAX_INVENTORY)
 	{
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Inventar plin!");
-		menu_destroy(menu);
+		show_unequip(id);
 		return PLUGIN_HANDLED;
 	}
 	
@@ -2946,7 +3182,7 @@ public unequip_handler(id, menu, item)
 	new ret;
 	ExecuteForward(g_fwd_ItemUnequipped, ret, id, itemid, slot);
 	
-	menu_destroy(menu);
+	show_unequip(id); // re-open
 	return PLUGIN_HANDLED;
 }
 
@@ -2966,6 +3202,7 @@ stock use_potion_menu(id)
 			menu_additem(menu, tmp, info);
 		}
 	}
+	menu_additem(menu, "\rInapoi", "999");
 	
 	menu_display(id, menu);
 }
@@ -2981,22 +3218,31 @@ public potion_handler(id, menu, item)
 	new data[6];
 	menu_item_getinfo(menu, item, _, data, charsmax(data), _, _, _);
 	new inv_slot = str_to_num(data);
+	menu_destroy(menu);
+	
+	if (inv_slot == 999)
+	{
+		cmd_inventar(id);
+		return PLUGIN_HANDLED;
+	}
 	
 	new itemid = g_Player[id][g_Inventory][inv_slot];
 	
 	if (itemid <= 0 || itemid >= g_ItemCount || g_Items[itemid][ItemType] != ITEM_POTION)
 	{
-		menu_destroy(menu);
+		use_potion_menu(id);
 		return PLUGIN_HANDLED;
 	}
 	
-	if (g_Items[itemid][ItemPotionType] == 1) // HP
+	new potion_type = g_Items[itemid][ItemPotionType];
+	
+	if (potion_type == 1) // HP
 	{
 		new hp = get_user_health(id);
 		set_user_health(id, min(hp + 80, 100 + g_Player[id][g_HP] * 10 + 50));
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Ai folosit Lichior HP!");
 	}
-	else if (g_Items[itemid][ItemPotionType] == 2) // MP
+	else if (potion_type == 2) // MP
 	{
 		g_Player[id][g_MP] = min(g_Player[id][g_MP] + 60, g_Player[id][g_MaxMP]);
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Ai folosit Lichior MP!");
@@ -3004,7 +3250,7 @@ public potion_handler(id, menu, item)
 	else
 	{
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Acest item nu este o potiune valida.");
-		menu_destroy(menu);
+		use_potion_menu(id);
 		return PLUGIN_HANDLED;
 	}
 	
@@ -3019,8 +3265,12 @@ public potion_handler(id, menu, item)
 	g_Player[id][g_InventoryUpgrade][g_Player[id][g_InventoryCount] - 1] = 0;
 	g_Player[id][g_InventoryCount]--;
 	
+	// Forward
+	new ret;
+	ExecuteForward(g_fwd_ItemUsed, ret, id, itemid, potion_type);
+	
 	save_player(id);
-	menu_destroy(menu);
+	use_potion_menu(id); // re-open
 	return PLUGIN_HANDLED;
 }
 
@@ -3044,6 +3294,7 @@ public cmd_upgrade(id)
 			}
 		}
 	}
+	menu_additem(menu, "\rInapoi", "999");
 	
 	menu_display(id, menu);
 	return PLUGIN_HANDLED;
@@ -3060,6 +3311,13 @@ public upgrade_menu_handler(id, menu, item)
 	new data[6];
 	menu_item_getinfo(menu, item, _, data, charsmax(data), _, _, _);
 	new inv_slot = str_to_num(data);
+	menu_destroy(menu);
+	
+	if (inv_slot == 999)
+	{
+		cmd_menu(id);
+		return PLUGIN_HANDLED;
+	}
 	
 	new upg = g_Player[id][g_InventoryUpgrade][inv_slot];
 	new cost = 1000 * (upg + 1) * (upg + 1);
@@ -3067,7 +3325,7 @@ public upgrade_menu_handler(id, menu, item)
 	if (g_Player[id][g_Yang] < cost)
 	{
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Nu ai destul Yang! Cost: %d", cost);
-		menu_destroy(menu);
+		cmd_upgrade(id);
 		return PLUGIN_HANDLED;
 	}
 	
@@ -3120,7 +3378,7 @@ public upgrade_menu_handler(id, menu, item)
 	}
 
 	save_player(id);
-	menu_destroy(menu);
+	cmd_upgrade(id); // re-open (nu se inchide)
 	return PLUGIN_HANDLED;
 }
 
@@ -3141,6 +3399,7 @@ public cmd_shop(id)
 		formatex(info, charsmax(info), "%d", i);
 		menu_additem(menu, tmp, info);
 	}
+	menu_additem(menu, "\rInapoi", "0");
 	
 	menu_display(id, menu);
 	return PLUGIN_HANDLED;
@@ -3157,17 +3416,24 @@ public shop_handler(id, menu, item)
 	new data[6];
 	menu_item_getinfo(menu, item, _, data, charsmax(data), _, _, _);
 	new itemid = str_to_num(data);
+	menu_destroy(menu);
+	
+	if (itemid == 0)
+	{
+		cmd_menu(id);
+		return PLUGIN_HANDLED;
+	}
 	
 	if (itemid <= 0 || itemid >= g_ItemCount)
 	{
-		menu_destroy(menu);
+		cmd_shop(id);
 		return PLUGIN_HANDLED;
 	}
 	
 	if (g_Player[id][g_InventoryCount] >= MAX_INVENTORY)
 	{
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Inventar plin!");
-		menu_destroy(menu);
+		cmd_shop(id);
 		return PLUGIN_HANDLED;
 	}
 	
@@ -3175,7 +3441,7 @@ public shop_handler(id, menu, item)
 	if (g_Player[id][g_Yang] < price)
 	{
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Yang insuficient!");
-		menu_destroy(menu);
+		cmd_shop(id);
 		return PLUGIN_HANDLED;
 	}
 	
@@ -3187,9 +3453,13 @@ public shop_handler(id, menu, item)
 	g_Player[id][g_InventoryCount]++;
 	
 	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai cumparat ^3%s", g_Items[itemid][ItemName]);
-	save_player(id);
 	
-	menu_destroy(menu);
+	// Forward
+	new ret;
+	ExecuteForward(g_fwd_ItemBought, ret, id, itemid, price);
+	
+	save_player(id);
+	cmd_shop(id); // re-open (nu se inchide)
 	return PLUGIN_HANDLED;
 }
 
@@ -3204,66 +3474,53 @@ public cmd_status_motd(id)
 		return PLUGIN_HANDLED;
 	}
 	
-	static motd[1100];
-	new len = 0;
-	
+	static motd[1536];
 	new name[32];
 	get_user_name(id, name, charsmax(name));
-	
 	new needed = get_xp_needed(g_Player[id][g_Level]);
 	
-	// Header
-	len = formatex(motd[len], charsmax(motd) - len,
-		"<html><body bgcolor=#111111 text=#e0e0e0 style='font-family:Arial;font-size:13px;margin:6px'>");
+	// Copiem numele itemelor in buffere locale (get_item_name e static)
+	new wpn[32], arm[32], hlm[32], shd[32], sho[32], jwl[32];
+	copy(wpn, charsmax(wpn), get_item_name(g_Player[id][g_Equipped][SLOT_WEAPON]));
+	copy(arm, charsmax(arm), get_item_name(g_Player[id][g_Equipped][SLOT_ARMOR]));
+	copy(hlm, charsmax(hlm), get_item_name(g_Player[id][g_Equipped][SLOT_HELMET]));
+	copy(shd, charsmax(shd), get_item_name(g_Player[id][g_Equipped][SLOT_SHIELD]));
+	copy(sho, charsmax(sho), get_item_name(g_Player[id][g_Equipped][SLOT_SHOES]));
+	copy(jwl, charsmax(jwl), get_item_name(g_Player[id][g_Equipped][SLOT_JEWEL]));
 	
-	len += formatex(motd[len], charsmax(motd) - len,
-		"<b style='color:#ffcc00;font-size:15px'>[Metin2] Status Character</b><br><br>");
+	// Compact HTML - minim tags
+	formatex(motd, charsmax(motd),
+		"<html><body bgcolor=#111 text=#ddd style='font:12px Arial;margin:4px'>\
+		<b style='color:#fc0'>[Metin2] Status</b><br>\
+		<font color=#4fc3f7>%s</font> | %s | Lv <font color=#ffd54f>%d</font><br>\
+		XP: %d/%d | Yang: %d<br>\
+		MP: %d/%d | SP: %d | SkP: %d<br>\
+		STR:%d HP:%d DEX:%d INT:%d<br><br>\
+		<b style='color:#81c784'>Echipament</b><br>\
+		Arma: %s +%d<br>\
+		Armura: %s +%d<br>\
+		Coif: %s +%d<br>\
+		Scut: %s +%d<br>\
+		Papuci: %s +%d<br>\
+		Bijuterie: %s +%d\
+		</body></html>",
+		name,
+		g_RaceName[g_Player[id][g_Race]],
+		g_Player[id][g_Level],
+		g_Player[id][g_XP], needed,
+		g_Player[id][g_Yang],
+		g_Player[id][g_MP], g_Player[id][g_MaxMP],
+		g_Player[id][g_StatPoints], g_Player[id][g_SkillPoints],
+		get_total_str(id), get_total_hp(id), get_total_dex(id), get_total_int(id),
+		wpn, g_Player[id][g_EquippedUpgrade][SLOT_WEAPON],
+		arm, g_Player[id][g_EquippedUpgrade][SLOT_ARMOR],
+		hlm, g_Player[id][g_EquippedUpgrade][SLOT_HELMET],
+		shd, g_Player[id][g_EquippedUpgrade][SLOT_SHIELD],
+		sho, g_Player[id][g_EquippedUpgrade][SLOT_SHOES],
+		jwl, g_Player[id][g_EquippedUpgrade][SLOT_JEWEL]
+	);
 	
-	// Nume + Rasă + Level
-	len += formatex(motd[len], charsmax(motd) - len,
-		"<b style='color:#4fc3f7'>Nume:</b> %s<br>", name);
-	
-	len += formatex(motd[len], charsmax(motd) - len,
-		"<b style='color:#4fc3f7'>Rasa:</b> %s<br>", g_RaceName[g_Player[id][g_Race]]);
-	
-	len += formatex(motd[len], charsmax(motd) - len,
-		"<b style='color:#4fc3f7'>Level:</b> <span style='color:#ffd54f'>%d</span><br>", g_Player[id][g_Level]);
-	
-	// XP exact (current / needed)
-	len += formatex(motd[len], charsmax(motd) - len,
-		"<b style='color:#4fc3f7'>XP:</b> %d / %d<br><br>", g_Player[id][g_XP], needed);
-	
-	// Stats totale (cu iteme)
-	len += formatex(motd[len], charsmax(motd) - len,
-		"<b style='color:#81c784'>=== Stats (cu iteme) ===</b><br>");
-	
-	len += formatex(motd[len], charsmax(motd) - len,
-		"<b>STR:</b> <span style='color:#ff8a65'>%d</span> &nbsp;&nbsp; ", get_total_str(id));
-	
-	len += formatex(motd[len], charsmax(motd) - len,
-		"<b>HP:</b> <span style='color:#ff8a65'>%d</span><br>", get_total_hp(id));
-	
-	len += formatex(motd[len], charsmax(motd) - len,
-		"<b>DEX:</b> <span style='color:#ff8a65'>%d</span> &nbsp;&nbsp; ", get_total_dex(id));
-	
-	len += formatex(motd[len], charsmax(motd) - len,
-		"<b>INT:</b> <span style='color:#ff8a65'>%d</span><br><br>", get_total_int(id));
-	
-	// Info extra utile
-	len += formatex(motd[len], charsmax(motd) - len,
-		"<b style='color:#81c784'>Yang:</b> %d<br>", g_Player[id][g_Yang]);
-	
-	len += formatex(motd[len], charsmax(motd) - len,
-		"<b style='color:#81c784'>MP:</b> %d / %d<br>", g_Player[id][g_MP], g_Player[id][g_MaxMP]);
-	
-	len += formatex(motd[len], charsmax(motd) - len,
-		"<b style='color:#81c784'>Puncte Stat:</b> %d &nbsp;|&nbsp; <b>Puncte Skill:</b> %d<br>",
-		g_Player[id][g_StatPoints], g_Player[id][g_SkillPoints]);
-	
-	// Închidere
-	len += formatex(motd[len], charsmax(motd) - len, "</body></html>");
-	
-	show_motd(id, motd, "[Metin2] Status Character");
+	show_motd(id, motd, "[Metin2] Status");
 	return PLUGIN_HANDLED;
 }
 
