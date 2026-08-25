@@ -20,7 +20,7 @@
 #include <fun>
 
 #define PLUGIN  "Metin2Core"
-#define VERSION "1.4"
+#define VERSION "1.5"
 #define AUTHOR  "Craxor"
 
 #define MAX_PLAYERS          32
@@ -105,6 +105,7 @@ new bool:g_AmbushActive[MAX_PLAYERS + 1];
 new bool:g_ResistActive[MAX_PLAYERS + 1];
 new bool:g_PierceActive[MAX_PLAYERS + 1];
 new bool:g_BlessActive[MAX_PLAYERS + 1];
+new bool:g_ForceUpgrade[MAX_PLAYERS + 1];
 new Float:g_ResistAmount[MAX_PLAYERS + 1];
 new Float:g_PierceAmount[MAX_PLAYERS + 1];
 new Float:g_BlessAmount[MAX_PLAYERS + 1];
@@ -262,6 +263,8 @@ public plugin_natives()
 	register_native("m2_get_total_hp",              "_m2_get_total_hp");
 	register_native("m2_get_total_dex",             "_m2_get_total_dex");
 	register_native("m2_get_total_int",             "_m2_get_total_int");
+	register_native("m2_set_force_upgrade",         "_m2_set_force_upgrade");
+	register_native("m2_get_force_upgrade",         "_m2_get_force_upgrade");
 }
 
 public plugin_init()
@@ -864,6 +867,23 @@ public _m2_get_total_int(plugin, params)
 	return get_total_int(id);
 }
 
+public _m2_set_force_upgrade(plugin, params)
+{
+	new id = get_param(1);
+	new bool:enable = bool:get_param(2);
+	if (!is_user_connected(id)) return 0;
+
+	g_ForceUpgrade[id] = enable;
+	return 1;
+}
+
+public _m2_get_force_upgrade(plugin, params)
+{
+	new id = get_param(1);
+	if (!is_user_connected(id)) return 0;
+	return g_ForceUpgrade[id];
+}
+
 // ======================== NAME CHANGE BLOCK ========================
 public OnClientUserInfoChanged(id)
 {
@@ -978,6 +998,7 @@ stock reset_player(id)
 	g_ResistActive[id] = false;
 	g_PierceActive[id] = false;
 	g_BlessActive[id] = false;
+	g_ForceUpgrade[id] = false;
 	g_ResistAmount[id] = 0.0;
 	g_PierceAmount[id] = 0.0;
 	g_BlessAmount[id] = 0.0;
@@ -3128,24 +3149,49 @@ public equip_handler(id, menu, item)
 		return PLUGIN_HANDLED;
 	}
 	
-	g_Player[id][g_Equipped][equip_slot] = itemid;
-	g_Player[id][g_EquippedUpgrade][equip_slot] = upg;
+	// --- SWAP LOGIC ---
+	// Salvăm itemul vechi (dacă există) ca să-l punem înapoi în inventar
+	new old_itemid = g_Player[id][g_Equipped][equip_slot];
+	new old_upg    = g_Player[id][g_EquippedUpgrade][equip_slot];
 	
+	// 1. Scoatem itemul NOU din inventar (eliberează un slot)
 	for (new i = inv_slot; i < g_Player[id][g_InventoryCount] - 1; i++)
 	{
 		g_Player[id][g_Inventory][i] = g_Player[id][g_Inventory][i + 1];
 		g_Player[id][g_InventoryUpgrade][i] = g_Player[id][g_InventoryUpgrade][i + 1];
 	}
-
 	g_Player[id][g_Inventory][g_Player[id][g_InventoryCount] - 1] = 0;
 	g_Player[id][g_InventoryUpgrade][g_Player[id][g_InventoryCount] - 1] = 0;
 	g_Player[id][g_InventoryCount]--;
 	
+	// 2. Dacă exista un item vechi pe slot → îl punem în inventar (acum avem loc sigur)
+	if (old_itemid > 0 && old_itemid < g_ItemCount)
+	{
+		// Forward pentru dezechipare
+		new ret_unequip;
+		ExecuteForward(g_fwd_ItemUnequipped, ret_unequip, id, old_itemid, equip_slot);
+		
+		new idx = g_Player[id][g_InventoryCount];
+		g_Player[id][g_Inventory][idx] = old_itemid;
+		g_Player[id][g_InventoryUpgrade][idx] = old_upg;
+		g_Player[id][g_InventoryCount]++;
+	}
+	
+	// 3. Echipăm itemul nou
+	g_Player[id][g_Equipped][equip_slot] = itemid;
+	g_Player[id][g_EquippedUpgrade][equip_slot] = upg;
+	
 	recalc_max_mp(id);
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai echipat ^3%s +%d", g_Items[itemid][ItemName], upg);
+	
+	if (old_itemid > 0)
+		client_print_color(id, print_team_default, "^4[Metin2]^1 Ai schimbat ^3%s +%d^1 cu ^3%s +%d", 
+			g_Items[old_itemid][ItemName], old_upg, g_Items[itemid][ItemName], upg);
+	else
+		client_print_color(id, print_team_default, "^4[Metin2]^1 Ai echipat ^3%s +%d", g_Items[itemid][ItemName], upg);
+	
 	save_player(id);
 	
-	// Forward
+	// Forward pentru echipare
 	new ret;
 	ExecuteForward(g_fwd_ItemEquipped, ret, id, itemid, equip_slot);
 	
@@ -3282,11 +3328,9 @@ public potion_handler(id, menu, item)
 		g_Player[id][g_MP] = min(g_Player[id][g_MP] + 60, g_Player[id][g_MaxMP]);
 		client_print_color(id, print_team_default, "^4[Metin2]^1 Ai folosit Lichior MP!");
 	}
-	else
+	else // custom - fara efect predefinit, tratat de un plugin extern prin forward-ul m2_item_used
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Acest item nu este o potiune valida.");
-		use_potion_menu(id);
-		return PLUGIN_HANDLED;
+		client_print_color(id, print_team_default, "^4[Metin2]^1 Ai folosit ^3%s^1!", g_Items[itemid][ItemName]);
 	}
 	
 	// Scoate din inventar
@@ -3367,7 +3411,15 @@ public upgrade_menu_handler(id, menu, item)
 	g_Player[id][g_Yang] -= cost;
 	
 	new chance;
-	if (upg < 6) chance = 85 - (upg * 5);
+	new bool:forced = g_ForceUpgrade[id];
+
+	if (forced)
+	{
+		chance = 100;
+		g_ForceUpgrade[id] = false; // se consuma la aceasta incercare, indiferent de rezultat
+		client_print_color(id, print_team_default, "^4[Metin2]^1 ^3Pergamentul Binecuvantarii^1 e activ - succes garantat!");
+	}
+	else if (upg < 6) chance = 85 - (upg * 5);
 	else if (upg == 6) chance = 50;
 	else if (upg == 7) chance = 30;
 	else chance = 15;
