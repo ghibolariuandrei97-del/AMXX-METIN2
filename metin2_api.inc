@@ -66,7 +66,9 @@
  * @param crit         Bonus Crit
  * @param speed        Bonus Speed
  * @param price        Preț Yang (0 = nu apare în magazin)
- * @param potion_type  0 = normal, 1 = HP Potion, 2 = MP Potion
+ * @param potion_type  1 = HP Potion, 2 = MP Potion, orice alta valoare (ex 3+) = item custom:
+ *                     nu are efect predefinit in core, dar la folosire declanseaza
+ *                     forward-ul m2_item_used(id, itemid, potion_type) ca sa il tratezi din plugin propriu.
  */
 native m2_register_item(const name[], type, req_level = 1, race_req = 0, str = 0, hp = 0, dex = 0, intt = 0, crit = 0, speed = 0, price = 0, potion_type = 0);
 
@@ -621,5 +623,25 @@ native m2_get_total_int(id);
 forward m2_item_bought(id, itemid, price);
 
 // Când un jucător folosește o poțiune
-// id = jucător, itemid = ID item, potion_type = 1 (HP) sau 2 (MP)
+// id = jucător, itemid = ID item, potion_type = 1 (HP), 2 (MP), sau altul (custom, tratat de plugin extern)
 forward m2_item_used(id, itemid, potion_type);
+
+// ======================== NATIVES NOI (v1.4) ========================
+
+/**
+ * Forteaza (sau anuleaza) urmatorul upgrade al jucatorului sa reuseasca 100%.
+ * Se consuma automat dupa o singura folosire a comenzii /upgrade (succes sau reset manual).
+ *
+ * @param id        Indexul jucatorului
+ * @param enable    true = urmatorul upgrade e garantat, false = anuleaza garantia
+ * @return          1 la succes, 0 daca jucatorul nu e conectat
+ */
+native m2_set_force_upgrade(id, bool:enable = true);
+
+/**
+ * Verifica daca jucatorul are activa garantia de succes la upgrade
+ *
+ * @param id        Indexul jucatorului
+ * @return          true daca are garantia activa
+ */
+native bool:m2_get_force_upgrade(id);
