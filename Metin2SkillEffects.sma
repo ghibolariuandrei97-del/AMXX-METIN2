@@ -52,9 +52,9 @@ new const g_iSkillCategory[MAX_SKILLS] = {
 	FX_STEALTH, FX_BUFF_SELF, FX_FLAG, FX_DOT, FX_AOE,
 	// NINJA - Arc (25-29)
 	FX_AOE, FX_AOE, FX_FLAG, FX_DOT, FX_AOE,
-	// SHAMAN - Zmeu (30-34) -- mecanica reala: heal/aura/bless/flag/aoe_stun
-	FX_HEAL, FX_BUFF_SELF, FX_BUFF_SELF, FX_FLAG, FX_AOE_STUN,
-	// SHAMAN - Fulger (35-39)
+	// SHAMAN - Zmeu (30-34) -- dupa fix core: AoE foc / beam foc / scut / speed / fury AoE
+	FX_AOE, FX_SINGLE_BEAM, FX_BUFF_SELF, FX_BUFF_SELF, FX_AOE,
+	// SHAMAN - Fulger (35-39) -- support: heal / aura / bless / flag / aoe stun
 	FX_HEAL, FX_BUFF_SELF, FX_BUFF_SELF, FX_FLAG, FX_AOE_STUN
 };
 
@@ -71,9 +71,9 @@ new const g_iSkillColor[MAX_SKILLS][3] = {
 	{60,60,60},   {255,255,255},{255,255,255}, {60,200,60},   {255,255,255},
 	// NINJA Arc
 	{255,255,255},{255,140,0},  {255,220,0},   {60,200,60},   {200,180,120},
-	// SHAMAN Zmeu
-	{0,255,120},  {255,200,50}, {100,255,100}, {0,150,255},   {200,220,255},
-	// SHAMAN Fulger
+	// SHAMAN Zmeu (foc / dragon: rosu-portocaliu)
+	{255,80,0},   {255,120,20}, {255,140,40},  {255,200,80},  {255,50,0},
+	// SHAMAN Fulger (verde/albastru support)
 	{0,255,120},  {255,220,50}, {80,255,120},  {0,150,255},   {200,220,255}
 };
 
@@ -181,9 +181,10 @@ Float:GetSkillDuration(id, skill_idx, level)
 		// Ninja Arc
 		case 28: return 5.0 + (l / 5.0);                    // Sageata Otravita (DoT)
 
-		// Shaman Zmeu (mecanica reala)
-		case 31: return 8.0 + (l * 0.15);                   // Atac Intens
-		case 32: return 9.0 + (l * 0.2);                    // Binecuvantare
+		// Shaman Zmeu (dupa fix core: scut + speed au durata)
+		case 32: return 7.0 + (l * 0.18);                   // Scut de Solzi
+		case 33: return 6.0 + (l * 0.12);                   // Zborul Dragonului
+		case 34: return 7.5 + (l * 0.16);                   // Furia Dragonului (aura)
 
 		// Shaman Fulger
 		case 36: return 8.5 + (l * 0.18);                   // Atac Intens
@@ -255,19 +256,19 @@ public plugin_precache()
 	g_iSkillSprite[28] = g_sprSteam;       // Sageata Otravita
 	g_iSkillSprite[29] = g_sprShockwave;   // AoE
 
-	// SHAMAN Zmeu
-	g_iSkillSprite[30] = g_sprDot;         // Heal
-	g_iSkillSprite[31] = g_sprDot;         // Aura
-	g_iSkillSprite[32] = g_sprDot;         // Bless
-	g_iSkillSprite[33] = g_sprDot;         // Flag
-	g_iSkillSprite[34] = g_sprLightning;   // AoE Stun
+	// SHAMAN Zmeu (dragon / foc)
+	g_iSkillSprite[30] = g_sprShockwave;   // Chemarea Dragonului (AoE)
+	g_iSkillSprite[31] = g_sprLaser;       // Flacara Dragonului (beam)
+	g_iSkillSprite[32] = g_sprShockwave;   // Scut de Solzi
+	g_iSkillSprite[33] = g_sprLaser;       // Zborul Dragonului (speed trail)
+	g_iSkillSprite[34] = g_sprShockwave;   // Furia Dragonului (AoE)
 
-	// SHAMAN Fulger
-	g_iSkillSprite[35] = g_sprDot;         // Heal
-	g_iSkillSprite[36] = g_sprDot;         // Aura
-	g_iSkillSprite[37] = g_sprDot;         // Bless
-	g_iSkillSprite[38] = g_sprDot;         // Flag
-	g_iSkillSprite[39] = g_sprLightning;   // AoE Stun
+	// SHAMAN Fulger (support)
+	g_iSkillSprite[35] = g_sprDot;         // Lecuire
+	g_iSkillSprite[36] = g_sprDot;         // Atac Intens
+	g_iSkillSprite[37] = g_sprDot;         // Binecuvantare
+	g_iSkillSprite[38] = g_sprDot;         // Iutesenie
+	g_iSkillSprite[39] = g_sprLightning;   // Chemarea Fulgerului
 
 	// ---- SOUNDS ----
 	static const szSounds[][] = {
@@ -397,7 +398,7 @@ RenderSkillEffect(id, skill_idx, skill_level)
 			FxRingpoint(aim_origin, g_sprShockwave, floatround(18.0 * scale), r, g, b, 190);
 
 			if (tier >= 2) // G / P
-				FxExplosion(aim_origin, g_sprShockwave, floatround(10.0 * scale), r, g, b);
+				FxExplosion(aim_origin, floatround(10.0 * scale), r, g, b);
 		}
 		case FX_SLOW:
 		{
@@ -419,7 +420,7 @@ RenderSkillEffect(id, skill_idx, skill_level)
 		}
 		case FX_AOE:
 		{
-			FxExplosion(aim_origin, sprite, floatround(16.0 * scale), r, g, b);
+			FxExplosion(aim_origin, floatround(16.0 * scale), r, g, b);
 			FxShockwave(aim_origin, r, g, b, floatround(36.0 * scale));
 			FxDlight(aim_origin, r, g, b, floatround(22.0 * scale), 5 + tier);
 
@@ -465,7 +466,7 @@ RenderSkillEffect(id, skill_idx, skill_level)
 			FxBeamPoints(sky, origin, sprite, 2 + tier / 2, floatround(9.0 * scale) + beamWidthAdd, r, g, b, 255);
 			FxShockwave(origin, r, g, b, floatround(40.0 * scale));
 			FxDlight(origin, r, g, b, floatround(26.0 * scale), 6 + tier);
-			FxExplosion(origin, g_sprShockwave, floatround(12.0 * scale), r, g, b);
+			FxExplosion(origin, floatround(12.0 * scale), r, g, b);
 
 			// P: al doilea fulger + shockwave extra
 			if (tier >= 3)
@@ -599,17 +600,18 @@ FxRingpoint(origin[3], sprite, radius, r, g, b, brightness)
 	message_end();
 }
 
-FxExplosion(origin[3], sprite, scale, r, g, b)
+FxExplosion(origin[3], scale, r, g, b)
 {
+	// Mereu shockwave.spr pentru TE_EXPLOSION (alte sprite-uri pot crasa clientul)
 	new sc = clamp_byte(scale / 4, 5, 25);
 
 	message_begin(MSG_PVS, SVC_TEMPENTITY, origin);
 	write_byte(TE_EXPLOSION);
 	write_coord(origin[0]); write_coord(origin[1]); write_coord(origin[2]);
-	write_short(sprite);            // Înlocuit g_sprShockwave cu sprite
+	write_short(g_sprShockwave);
 	write_byte(sc);                 // scale
 	write_byte(12);                 // framerate
-	write_byte(0);                  // flags (0 = normal)
+	write_byte(0);                  // flags
 	message_end();
 
 	FxDlight(origin, r, g, b, scale, 5);
