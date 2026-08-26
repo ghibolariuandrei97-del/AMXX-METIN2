@@ -1849,73 +1849,20 @@ stock skill_ninja_lame(id, slot, lvl)
 // ---------- SHAMAN ----------
 stock skill_shaman_zmeu(id, slot, lvl)
 {
-	new Float:power = float(lvl) * 2.0 + float(g_Player[id][g_INT]) * 1.1;
+	new Float:power = float(lvl) * 2.2 + float(g_Player[id][g_INT]) * 1.15;
 	
 	switch (slot)
 	{
-		case 0: // Heal
-		{
-			new heal = 40 + floatround(power);
-			new hp = get_user_health(id);
-			new maxhp = 100 + g_Player[id][g_HP] * 10;
-			
-			// Bonus armura
-			for (new i = 0; i < MAX_EQUIP_SLOTS; i++)
-			{
-				new itemid = g_Player[id][g_Equipped][i];
-				if (itemid > 0 && itemid < g_ItemCount)
-					maxhp += g_Items[itemid][ItemHp] + g_Player[id][g_EquippedUpgrade][i] * 3;
-			}
-			
-			set_user_health(id, min(hp + heal, maxhp));
-			apply_skill_cooldown(id, 0, 14.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Lecuire: ai vindecat ^3%d HP^1 (bazat pe INT + nivel skill)!", heal);
-		}
-		case 1: // Atac Intens (self damage buff)
-		{
-			g_AuraActive[id] = true;
-			new Float:dur = 8.0 + (lvl * 0.15);
-			set_user_rendering(id, kRenderFxGlowShell, 255, 200, 50, kRenderNormal, 40);
-			set_task(dur, "RemoveAura", id);
-			apply_skill_cooldown(id, 1, 35.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Atac Intens: +damage activ timp de ^3%.1f secunde^1!", dur);
-		}
-		case 2: // Binecuvantare - real defense buff
-		{
-			g_BlessActive[id] = true;
-			g_BlessAmount[id] = 15.0 + (float(lvl) * 1.2) + (float(g_Player[id][g_INT]) * 0.8);
-			
-			new Float:dur = 9.0 + (lvl * 0.2);
-			set_user_rendering(id, kRenderFxGlowShell, 100, 255, 100, kRenderNormal, 35);
-			set_task(dur, "RemoveBless", id);
-			apply_skill_cooldown(id, 2, 28.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Binecuvantare: +%.0f defense timp de ^3%.1f secunde^1!", g_BlessAmount[id], dur);
-		}
-		case 3: // Iutesenie - reset cooldowns
-		{
-			for (new i = 0; i < 5; i++)
-				g_SkillCooldown[id][i] = 0.0;
-			apply_skill_cooldown(id, 3, 55.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Iutesenie: ^3toate cooldown-urile au fost resetate^1! (CD lung pe acest skill)");
-		}
-		case 4: // Chemarea Fulgerului - flash + small AoE stun chance
+		// 0 - Chemarea Dragonului: AoE foc în jurul tău
+		case 0:
 		{
 			new Float:origin[3];
 			pev(id, pev_origin, origin);
-
-			engfunc(EngFunc_MessageBegin, MSG_PVS, get_user_msgid("ScreenFade"), origin, 0);
-			write_short(1<<10);
-			write_short(1<<10);
-			write_short(1<<12);
-			write_byte(255);
-			write_byte(255);
-			write_byte(255);
-			write_byte(220);
-			message_end();
 			
-			// Small chance to stun nearby enemies
-			new Float:radius = 200.0 + (lvl * 2.0);
-			new stunned = 0;
+			new Float:radius = 220.0 + (lvl * 3.0);
+			new Float:dmg = 35.0 + power * 0.9;
+			new hit = 0;
+			
 			for (new i = 1; i <= MaxClients; i++)
 			{
 				if (!is_user_alive(i) || i == id) continue;
@@ -1926,21 +1873,96 @@ stock skill_shaman_zmeu(id, slot, lvl)
 				
 				if (get_distance_f(origin, torigin) < radius)
 				{
-					if (random_num(1, 100) <= (25 + lvl / 2))
-					{
-						set_pev(i, pev_flags, pev(i, pev_flags) | FL_FROZEN);
-						set_task(1.2 + (lvl * 0.03), "Unfreeze", i);
-						stunned++;
-					}
+					ExecuteHamB(Ham_TakeDamage, i, id, id, dmg, DMG_BURN);
+					hit++;
 				}
 			}
 			
-			apply_skill_cooldown(id, 4, 32.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Chemarea Fulgerului: flash + sansa de stun pe inamicii apropiati (stunati: %d)!", stunned);
+			apply_skill_cooldown(id, 0, 16.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Chemarea Dragonului: ^3%.0f^1 dmg foc pe %d inamici!", dmg, hit);
+		}
+		
+		// 1 - Flacara Dragonului: damage mare single-target + mic DoT vizual (instant heavy hit)
+		case 1:
+		{
+			new target = get_aim_target(id);
+			if (is_user_alive(target))
+			{
+				new Float:dmg = 55.0 + power * 1.1;
+				ExecuteHamB(Ham_TakeDamage, target, id, id, dmg, DMG_BURN);
+				apply_skill_cooldown(id, 1, 14.0);
+				client_print_color(id, print_team_default, "^4[Metin2]^1 Flacara Dragonului: ^3%.0f^1 dmg foc!", dmg);
+			}
+			else
+			{
+				apply_skill_cooldown(id, 1, 14.0);
+				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
+			}
+		}
+		
+		// 2 - Scut de Solzi: reducere damage (folosește sistemul de resist existent)
+		case 2:
+		{
+			g_ResistActive[id] = true;
+			g_ResistAmount[id] = 0.28 + (float(lvl) * 0.006);
+			if (g_ResistAmount[id] > 0.48) g_ResistAmount[id] = 0.48;
+			
+			new Float:dur = 7.0 + (lvl * 0.18);
+			set_user_rendering(id, kRenderFxGlowShell, 255, 140, 40, kRenderNormal, 40);
+			set_task(dur, "RemoveResist", id);
+			apply_skill_cooldown(id, 2, 26.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Scut de Solzi: reducere damage ^3%.0f%%^1 timp de %.1f sec!", g_ResistAmount[id]*100.0, dur);
+		}
+		
+		// 3 - Zborul Dragonului: boost de viteză
+		case 3:
+		{
+			new Float:speed = 280.0 + (lvl * 1.5) + float(g_Player[id][g_DEX]) * 0.4;
+			// bonus din papuci
+			for (new i = 0; i < MAX_EQUIP_SLOTS; i++)
+			{
+				new itemid = g_Player[id][g_Equipped][i];
+				if (itemid > 0 && itemid < g_ItemCount)
+					speed += float(g_Items[itemid][ItemSpeed] + g_Player[id][g_EquippedUpgrade][i] * 2);
+			}
+			
+			set_user_maxspeed(id, speed);
+			new Float:dur = 6.0 + (lvl * 0.12);
+			set_task(dur, "RestoreSpeed", id);
+			apply_skill_cooldown(id, 3, 22.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Zborul Dragonului: viteza crescuta timp de ^3%.1f sec^1!", dur);
+		}
+		
+		// 4 - Furia Dragonului: buff puternic de damage + mic AoE la activare
+		case 4:
+		{
+			g_AuraActive[id] = true;
+			new Float:dur = 7.5 + (lvl * 0.16);
+			set_user_rendering(id, kRenderFxGlowShell, 255, 60, 0, kRenderNormal, 45);
+			set_task(dur, "RemoveAura", id);
+			
+			// mic burst AoE la activare
+			new Float:origin[3];
+			pev(id, pev_origin, origin);
+			new Float:burst = 25.0 + power * 0.5;
+			
+			for (new i = 1; i <= MaxClients; i++)
+			{
+				if (!is_user_alive(i) || i == id) continue;
+				if (get_user_team(i) == get_user_team(id)) continue;
+				
+				new Float:torigin[3];
+				pev(i, pev_origin, torigin);
+				
+				if (get_distance_f(origin, torigin) < 180.0)
+					ExecuteHamB(Ham_TakeDamage, i, id, id, burst, DMG_BURN);
+			}
+			
+			apply_skill_cooldown(id, 4, 34.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Furia Dragonului: +damage + burst foc timp de ^3%.1f sec^1!", dur);
 		}
 	}
 }
-
 
 // ======================== WARRIOR - MENTAL ========================
 stock skill_warrior_mental(id, slot, lvl)
