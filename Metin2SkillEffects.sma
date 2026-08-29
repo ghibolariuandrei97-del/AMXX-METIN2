@@ -6,20 +6,29 @@
 #include <metin2_api>
 
 #define PLUGIN  "Metin2 Skill Effects"
-#define VERSION "2.1"
+#define VERSION "2.2"
 #define AUTHOR  "Andrew"
 
 /*================================================================================
-	IMPORTANT - sincronizare cu metin2Core.sma
+	IMPORTANT - sincronizare cu metin2Core.sma (v1.5+ scaling)
 
-	Duratele de mai jos NU mai sunt valori inventate, ci copiate exact din
-	formulele folosite in metin2Core.sma. Folosesc get_user_m2_int() din API
-	pentru INT, asa ca aura/shield-ul dispare vizual exact cand dispare mecanic.
+	Duratele de mai jos sunt aliniate cu formulele din metin2Core:
+	  GetSkillDuration(base, skill_lvl, player_lvl, per_skill, per_level)
+	+ aceleasi cap-uri (max duration) ca in core.
 
-	OBSERVATIE despre core-ul tau:
-	skill_shaman_zmeu (indecsii 30-34) executa de fapt mecanicile de Heal /
-	Atac Intens / Binecuvantare / Iutesenie / Chemarea Fulgerului.
-	Efectele vizuale urmeaza mecanica REALA, nu numele de Dragon.
+	API folosite:
+	  get_user_m2_level()  - player level
+	  get_user_m2_int()    - INT (unde mai e relevant la stun-uri vechi)
+
+	Skill mapping (core real):
+	  0-4   Warrior Corporal
+	  5-9   Warrior Mental
+	  10-14 Sura Arme Magice
+	  15-19 Sura Magie Neagra
+	  20-24 Ninja Lame
+	  25-29 Ninja Arc
+	  30-34 Shaman Zmeu (Dragon)
+	  35-39 Shaman Fulger (Support)
 ================================================================================*/
 
 #define MAX_SKILLS 40
@@ -144,54 +153,149 @@ stock Float:GetRankScale(level)
 	return scales[GetRankTier(level)];
 }
 
-// ======================== DURATA REALA ========================
-Float:GetSkillDuration(id, skill_idx, level)
+// ======================== DURATA REALA (sincron cu metin2Core) ========================
+// Formulele oglindesc GetSkillDuration() + cap-urile din core.
+stock Float:GetSkillDuration(id, skill_idx, level)
 {
-	new Float:intt = float(get_user_m2_int(id));
 	new Float:l = float(level);
+	new Float:pl = float(get_user_m2_level(id));
+	new Float:intt = float(get_user_m2_int(id));
+	new Float:dur;
 
 	switch (skill_idx)
 	{
-		// Warrior Corporal
-		case 0:  return 8.0 + (l * 0.25) + (intt * 0.1);   // Aura Sabiei
-		case 1:  return 7.0 + (l * 0.2);                    // Corp Rezistent
-		case 2:  return 1.4 + (l * 0.06) + (intt * 0.02);   // Izbitura (stun)
+		// ===== WARRIOR - Corporal =====
+		case 0: // Aura Sabiei
+		{
+			dur = 8.0 + (l * 0.28) + (pl * 0.15);
+			return (dur > 18.0) ? 18.0 : dur;
+		}
+		case 1: // Corp Rezistent
+		{
+			dur = 7.0 + (l * 0.22) + (pl * 0.12);
+			return (dur > 16.0) ? 16.0 : dur;
+		}
+		case 2: // Izbitura (stun)
+		{
+			dur = 1.4 + (l * 0.07) + (pl * 0.015);
+			return (dur > 3.5) ? 3.5 : dur;
+		}
 
-		// Warrior Mental
-		case 6:  return 6.5 + (l * 0.18);                   // Scut Mental
-		case 8:  return 7.0 + (l * 0.2);                    // Concentrare
+		// ===== WARRIOR - Mental =====
+		case 6: // Scut Mental
+		{
+			dur = 6.5 + (l * 0.20) + (pl * 0.12);
+			return (dur > 14.0) ? 14.0 : dur;
+		}
+		case 8: // Concentrare
+		{
+			dur = 7.0 + (l * 0.22) + (pl * 0.13);
+			return (dur > 15.0) ? 15.0 : dur;
+		}
 
-		// Sura Arme Magice
-		case 10: return 7.0 + (l * 0.2);                    // Tais Vrajit
-		case 11: return 6.0 + (l * 0.18);                   // Armura Vrajita
-		case 12: return 6.0 + (l * 0.15);                   // Lovitura Degetului
-		case 13: return 3.5 + (l * 0.1);                    // Atacul Fulgerului (slow)
-		case 14: return 1.8 + (l * 0.05) + (intt * 0.03) + 2.5; // Pietrificare
+		// ===== SURA - Arme Magice =====
+		case 10: // Tais Vrajit
+		{
+			dur = 7.0 + (l * 0.22) + (pl * 0.13);
+			return (dur > 16.0) ? 16.0 : dur;
+		}
+		case 11: // Armura Vrajita (reflect)
+		{
+			dur = 6.0 + (l * 0.20) + (pl * 0.12);
+			return (dur > 14.0) ? 14.0 : dur;
+		}
+		case 12: // Lovitura Degetului (pierce)
+		{
+			dur = 6.0 + (l * 0.18) + (pl * 0.10);
+			return (dur > 12.0) ? 12.0 : dur;
+		}
+		case 13: // Atacul Fulgerului (slow)
+		{
+			dur = 3.5 + (l * 0.12) + (pl * 0.04) + (intt * 0.02);
+			return (dur > 7.0) ? 7.0 : dur;
+		}
+		case 14: // Pietrificare (stun + residual slow ~2.5s)
+		{
+			dur = 1.8 + (l * 0.06) + (intt * 0.025) + (pl * 0.02);
+			if (dur > 4.0) dur = 4.0;
+			return dur + 2.5;
+		}
 
-		// Sura Magie Neagra
-		case 15: return 4.0 + (l / 8.0);                    // Flacara Intunecata (DoT)
-		case 16: return 5.0;                                 // Blestem
-		case 18: return 4.0 + (l * 0.15);                   // Umbre
+		// ===== SURA - Magie Neagra =====
+		case 15: // Flacara Intunecata (DoT ticks)
+		{
+			new ticks = 4 + (level / 6) + (get_user_m2_level(id) / 25);
+			if (ticks > 10) ticks = 10;
+			return float(ticks);
+		}
+		case 16: // Blestem
+		{
+			dur = 4.0 + (l * 0.14) + (pl * 0.05) + (intt * 0.02);
+			return (dur > 8.0) ? 8.0 : dur;
+		}
+		case 18: // Umbre
+		{
+			dur = 4.0 + (l * 0.18) + (pl * 0.10);
+			return (dur > 11.0) ? 11.0 : dur;
+		}
 
-		// Ninja Lame
-		case 20: return 4.5 + (l * 0.18) + (intt * 0.05);   // Camuflaj
-		case 21: return 6.0 + (l * 0.1);                    // Atacul Fulgerator
-		case 23: return 4.0 + (l / 6.0);                    // Otrava (DoT)
+		// ===== NINJA - Lame =====
+		case 20: // Camuflaj
+		{
+			dur = 4.5 + (l * 0.20) + (pl * 0.10);
+			return (dur > 12.0) ? 12.0 : dur;
+		}
+		case 21: // Atacul Fulgerator (speed)
+		{
+			dur = 6.0 + (l * 0.15) + (pl * 0.10);
+			return (dur > 12.0) ? 12.0 : dur;
+		}
+		case 23: // Otrava (DoT)
+		{
+			new ticks = 4 + (level / 5) + (get_user_m2_level(id) / 20);
+			if (ticks > 12) ticks = 12;
+			return float(ticks);
+		}
 
-		// Ninja Arc
-		case 28: return 5.0 + (l / 5.0);                    // Sageata Otravita (DoT)
+		// ===== NINJA - Arc =====
+		case 28: // Sageata Otravita (DoT)
+		{
+			new ticks = 5 + (level / 4) + (get_user_m2_level(id) / 20);
+			if (ticks > 14) ticks = 14;
+			return float(ticks);
+		}
 
-		// Shaman Zmeu (dupa fix core: scut + speed au durata)
-		case 32: return 7.0 + (l * 0.18);                   // Scut de Solzi
-		case 33: return 6.0 + (l * 0.12);                   // Zborul Dragonului
-		case 34: return 7.5 + (l * 0.16);                   // Furia Dragonului (aura)
+		// ===== SHAMAN - Zmeu =====
+		case 32: // Scut de Solzi
+		{
+			dur = 7.0 + (l * 0.20) + (pl * 0.12);
+			return (dur > 15.0) ? 15.0 : dur;
+		}
+		case 33: // Zborul Dragonului
+		{
+			dur = 6.0 + (l * 0.15) + (pl * 0.10);
+			return (dur > 12.0) ? 12.0 : dur;
+		}
+		case 34: // Furia Dragonului
+		{
+			dur = 7.5 + (l * 0.20) + (pl * 0.13);
+			return (dur > 16.0) ? 16.0 : dur;
+		}
 
-		// Shaman Fulger
-		case 36: return 8.5 + (l * 0.18);                   // Atac Intens
-		case 37: return 10.0 + (l * 0.22);                  // Binecuvantare
+		// ===== SHAMAN - Fulger =====
+		case 36: // Atac Intens
+		{
+			dur = 8.5 + (l * 0.22) + (pl * 0.14);
+			return (dur > 18.0) ? 18.0 : dur;
+		}
+		case 37: // Binecuvantare
+		{
+			dur = 10.0 + (l * 0.25) + (pl * 0.15);
+			return (dur > 20.0) ? 20.0 : dur;
+		}
 	}
 
-	return 0.0; // instant
+	return 0.0; // instant (fara loop persistent)
 }
 
 // ======================== PLUGIN INIT ========================
@@ -304,19 +408,19 @@ public m2_skill_used(id, skill_idx, skill_level)
 	new category = g_iSkillCategory[skill_idx];
 	new Float:duration = GetSkillDuration(id, skill_idx, skill_level);
 
-	// Doar categoriile cu efect vizibil in timp au nevoie de loop
-	if (duration > 0.0 && (category == FX_BUFF_SELF || category == FX_STEALTH || category == FX_DOT))
+	// Loop persistent doar pe caster (buff / stealth).
+	// DoT-ul e pe tinta (aim) → doar efectul instant din RenderSkillEffect e corect.
+	if (duration > 0.0 && (category == FX_BUFF_SELF || category == FX_STEALTH))
 	{
 		g_bEffectActive[id] = true;
 		g_iActiveSkill[id] = skill_idx;
 		g_iActiveSkillLevel[id] = skill_level;
 		g_flEffectEndTime[id] = get_gametime() + duration;
 
-		if (category == FX_STEALTH)
-			set_user_rendering(id, kRenderFxNone, 255, 255, 255, kRenderTransAlpha, 90);
+		// Nu suprascriem rendering-ul de stealth al core-ului (alpha 8-15).
 
 		remove_task(TASK_SKILL_LOOP + id);
-		set_task(0.4, "task_persistent_fx", TASK_SKILL_LOOP + id, _, _, "b");
+		set_task(0.35, "task_persistent_fx", TASK_SKILL_LOOP + id, _, _, "b");
 	}
 }
 
@@ -376,20 +480,26 @@ RenderSkillEffect(id, skill_idx, skill_level)
 	{
 		case FX_BUFF_SELF:
 		{
-			FxDlight(origin, r, g, b, floatround(18.0 * scale), 6 + tier);
-			FxRingpoint(origin, sprite, floatround(28.0 * scale), r, g, b, 200 + tier * 15);
+			FxDlight(origin, r, g, b, floatround(20.0 * scale), 7 + tier);
+			FxRingpoint(origin, sprite, floatround(30.0 * scale), r, g, b, 210 + tier * 15);
 			FxSpriteTrail(origin, sprite, particleCnt);
 
-			// La M+ mai multe inele
+			// La M+ mai multe inele concentrice
 			for (new i = 0; i < extraRings; i++)
-				FxRingpoint(origin, sprite, floatround((22.0 + i * 8.0) * scale), r, g, b, 160);
+				FxRingpoint(origin, sprite, floatround((22.0 + i * 9.0) * scale), r, g, b, 170 - i * 15);
+
+			// P: mic shockwave la activare
+			if (tier >= 3)
+				FxShockwave(origin, r, g, b, floatround(28.0 * scale));
 		}
 		case FX_STEALTH:
 		{
-			new puffs = 2 + tier;
+			new puffs = 3 + tier;
 			for (new i = 0; i < puffs; i++)
 				FxSmokePuff(origin);
-			FxDlight(origin, 70, 70, 70, 10 + tier * 3, 3 + tier);
+			FxDlight(origin, 55, 55, 70, 10 + tier * 3, 3 + tier);
+			if (tier >= 2)
+				FxCloud(origin, sprite, floatround(14.0 * scale));
 		}
 		case FX_STUN:
 		{
@@ -411,12 +521,18 @@ RenderSkillEffect(id, skill_idx, skill_level)
 		}
 		case FX_DOT:
 		{
-			FxCloud(aim_origin, sprite, floatround(20.0 * scale));
-			FxDlight(aim_origin, r, g, b, 11 + tier * 2, 4 + tier);
+			// pe tinta (aim), nu pe caster
+			FxCloud(aim_origin, sprite, floatround(22.0 * scale));
+			FxDlight(aim_origin, r, g, b, 12 + tier * 3, 5 + tier);
 			FxSmokePuff(aim_origin);
+			FxRingpoint(aim_origin, sprite, floatround(16.0 * scale), r, g, b, 160);
 
+			if (tier >= 1)
+				FxSmokePuff(aim_origin);
 			if (tier >= 2)
-				FxCloud(aim_origin, sprite, floatround(14.0 * scale));
+				FxCloud(aim_origin, sprite, floatround(16.0 * scale));
+			if (tier >= 3)
+				FxSpriteTrail(aim_origin, sprite, 4);
 		}
 		case FX_AOE:
 		{
@@ -488,7 +604,7 @@ RenderSkillEffect(id, skill_idx, skill_level)
 	}
 }
 
-// tick pentru efectele persistente (si el scaleaza cu rank)
+// tick pentru efectele persistente (scaleaza cu rank N/M/G/P)
 RenderPersistentTick(id, skill_idx, skill_level)
 {
 	new origin[3];
@@ -506,27 +622,37 @@ RenderPersistentTick(id, skill_idx, skill_level)
 	{
 		case FX_BUFF_SELF:
 		{
-			FxRingpoint(origin, sprite, floatround(18.0 * rankMul), r, g, b, 130 + tier * 20);
+			// inel periodic + dlight, mai dens la rank mare
+			FxRingpoint(origin, sprite, floatround(16.0 * rankMul), r, g, b, 140 + tier * 25);
 			if (random_num(0, 2 - (tier > 1 ? 1 : 0)) == 0)
-				FxDlight(origin, r, g, b, 12 + tier * 2, 2 + tier);
+				FxDlight(origin, r, g, b, 13 + tier * 3, 2 + tier);
 
-			// G/P: particule ocazionale
-			if (tier >= 2 && random_num(0, 3) == 0)
-				FxSpriteTrail(origin, sprite, 2);
+			if (tier >= 1 && random_num(0, 3) == 0)
+				FxSpriteTrail(origin, sprite, 2 + tier / 2);
+
+			// P: al doilea inel mai mare
+			if (tier >= 3 && random_num(0, 2) == 0)
+				FxRingpoint(origin, sprite, floatround(26.0 * rankMul), r, g, b, 110);
 		}
 		case FX_STEALTH:
 		{
+			// fum discret (nu interferam cu alpha din core)
 			if (random_num(0, 2 - (tier > 0 ? 1 : 0)) == 0)
 				FxSmokePuff(origin);
+			if (tier >= 2 && random_num(0, 4) == 0)
+				FxDlight(origin, 50, 50, 60, 8 + tier, 2);
 		}
 		case FX_DOT:
 		{
-			FxCloud(origin, sprite, floatround(12.0 * rankMul));
+			FxCloud(origin, sprite, floatround(13.0 * rankMul));
 			if (random_num(0, 1) == 0)
 				FxSmokePuff(origin);
 
-			if (tier >= 2 && random_num(0, 2) == 0)
-				FxDlight(origin, r, g, b, 10, 2);
+			if (tier >= 1)
+				FxDlight(origin, r, g, b, 9 + tier * 2, 2);
+
+			if (tier >= 3 && random_num(0, 2) == 0)
+				FxSpriteTrail(origin, sprite, 2);
 		}
 	}
 }
