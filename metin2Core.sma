@@ -20,7 +20,7 @@
 #include <fun>
 
 #define PLUGIN  "Metin2Core"
-#define VERSION "1.5"
+#define VERSION "1.6"
 #define AUTHOR  "Craxor"
 
 #define MAX_PLAYERS          32
@@ -1222,7 +1222,7 @@ public OnTakeDamage(victim, inflictor, attacker, Float:damage, damagebits)
 	if (attacker == victim)
 		return HC_CONTINUE;
 	
-	new Float:str_bonus = float(g_Player[attacker][g_STR]) * 1.5;
+	new Float:str_bonus = float(get_total_str(attacker)) * 1.35;
 	
 	// Bonus arma
 	new weap_id = g_Player[attacker][g_Equipped][SLOT_WEAPON];
@@ -1231,12 +1231,26 @@ public OnTakeDamage(victim, inflictor, attacker, Float:damage, damagebits)
 	if (weap_id > 0 && weap_id < g_ItemCount)
 		weap_bonus = float(g_Items[weap_id][ItemStr] * 2 + weap_upg * 4);
 	
-	// Aura Sabiei / Tais Vrajit / Atac Intens
+	// Aura Sabiei / Tais Vrajit / Atac Intens / Furia Dragonului / Concentrare
 	if (g_AuraActive[attacker])
 	{
 		new atk_path = g_Player[attacker][g_SkillPath];
 		new atk_skill_idx = (g_Player[attacker][g_Race]-1)*10 + (atk_path-1)*5;
-		weap_bonus += 25.0 + float(g_Player[attacker][g_SkillLevel][atk_skill_idx] * 2);
+		new skill_lvl = g_Player[attacker][g_SkillLevel][atk_skill_idx];
+		new player_lvl = g_Player[attacker][g_Level];
+		new race = g_Player[attacker][g_Race];
+
+		new Float:aura_bonus = 28.0 + float(skill_lvl) * 2.5 + float(player_lvl) * 0.6;
+
+		// Sinergie pe rasă
+		if (race == RACE_WARRIOR)
+			aura_bonus += float(get_total_str(attacker)) * 0.75;
+		else if (race == RACE_NINJA)
+			aura_bonus += float(get_total_dex(attacker)) * 0.70;
+		else // Sura / Shaman
+			aura_bonus += float(get_total_int(attacker)) * 0.70;
+
+		weap_bonus += aura_bonus;
 	}
 	
 	// Ambush (crit)
@@ -1247,8 +1261,8 @@ public OnTakeDamage(victim, inflictor, attacker, Float:damage, damagebits)
 		client_print_color(attacker, print_team_default, "^4[Metin2]^1 ^3AMBUSH CRIT!");
 	}
 	
-	// Armor Pierce - reduce defense
-	new Float:def = float(g_Player[victim][g_DEX]) * 0.8;
+	// Armor Pierce - reduce defense (folosește total DEX + armor)
+	new Float:def = float(get_total_dex(victim)) * 0.75;
 	new armor_id = g_Player[victim][g_Equipped][SLOT_ARMOR];
 	if (armor_id > 0 && armor_id < g_ItemCount)
 		def += float(g_Items[armor_id][ItemHp] + g_Player[victim][g_EquippedUpgrade][SLOT_ARMOR] * 3);
@@ -1456,16 +1470,35 @@ stock execute_skill(id, slot)
 
 stock apply_skill_cooldown(id, skill_slot, Float:base_cd)
 {
+	new Float:cd = GetSkillCooldown(id, skill_slot, base_cd);
+	g_SkillCooldown[id][skill_slot] = get_gametime() + cd;
+}
+
+// ======================== SKILL SCALING HELPERS ========================
+// Cooldown redus pe baza skill level + player level
+stock Float:GetSkillCooldown(id, skill_slot, Float:base_cd)
+{
 	new race = g_Player[id][g_Race];
 	new path = g_Player[id][g_SkillPath];
 	new skill_idx = (race - 1) * 10 + (path - 1) * 5 + skill_slot;
-	new lvl = g_Player[id][g_SkillLevel][skill_idx];
-	
-	// Cooldown scade pe masura ce skill-ul creste
-	new Float:cd = base_cd - (float(lvl) * 0.25);
-	if (cd < 4.0) cd = 4.0;
-	
-	g_SkillCooldown[id][skill_slot] = get_gametime() + cd;
+	new skill_lvl = g_Player[id][g_SkillLevel][skill_idx];
+	new player_lvl = g_Player[id][g_Level];
+
+	new Float:cd = base_cd;
+	cd -= float(skill_lvl) * 0.35;          // -0.35 pe skill level
+	cd -= float(player_lvl) * 0.08;         // -0.08 pe player level
+
+	if (cd < 3.0) cd = 3.0;                 // minim 3 secunde
+	return cd;
+}
+
+// Durată care crește cu Skill Level + Player Level
+stock Float:GetSkillDuration(Float:base_dur, Float:skill_lvl, player_lvl, Float:per_skill, Float:per_level)
+{
+	new Float:dur = base_dur;
+	dur += skill_lvl * per_skill;
+	dur += float(player_lvl) * per_level;
+	return dur;
 }
 
 public cmd_skill1(id) { execute_skill(id, 0); return PLUGIN_HANDLED; }
@@ -1477,29 +1510,33 @@ public cmd_skill5(id) { execute_skill(id, 4); return PLUGIN_HANDLED; }
 // ---------- WARRIOR ----------
 stock skill_warrior_corporal(id, slot, lvl)
 {
-	new Float:power = float(lvl) * 1.8 + float(g_Player[id][g_INT]) * 0.6;
+	// STR dominant + Level + Skill Level
+	new Float:power = float(lvl) * 2.2 + float(g_Player[id][g_Level]) * 1.1 + float(get_total_str(id)) * 1.8 + float(get_total_int(id)) * 0.35;
 	
 	switch (slot)
 	{
 		case 0: // Aura Sabiei - damage boost
 		{
 			g_AuraActive[id] = true;
-			new Float:dur = 8.0 + (lvl * 0.25) + (g_Player[id][g_INT] * 0.1);
+			new Float:dur = GetSkillDuration(8.0, float(lvl), g_Player[id][g_Level], 0.28, 0.15);
+			if (dur > 18.0) dur = 18.0;
 			set_user_rendering(id, kRenderFxGlowShell, 255, 80, 0, kRenderNormal, 40);
 			set_task(dur, "RemoveAura", id);
-			apply_skill_cooldown(id, 0, 22.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Aura Sabiei: +damage (%.0f sec). Bonus: +%.0f dmg!", dur, 25.0 + float(lvl * 2));
+			apply_skill_cooldown(id, 0, 20.0);
+			new Float:bonus = 28.0 + float(lvl) * 2.4 + float(get_total_str(id)) * 0.6 + float(g_Player[id][g_Level]) * 0.5;
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Aura Sabiei: +damage (%.1f sec). Bonus: +%.0f dmg!", dur, bonus);
 		}
-		case 1: // Corp Rezistent - real damage reduction
+		case 1: // Corp Rezistent - real damage reduction (HP dominant)
 		{
 			g_ResistActive[id] = true;
-			g_ResistAmount[id] = 0.25 + (float(lvl) * 0.008) + (float(g_Player[id][g_HP]) * 0.002);
-			if (g_ResistAmount[id] > 0.55) g_ResistAmount[id] = 0.55;
+			g_ResistAmount[id] = 0.25 + (float(lvl) * 0.008) + (float(get_total_hp(id)) * 0.003) + (float(g_Player[id][g_Level]) * 0.0015);
+			if (g_ResistAmount[id] > 0.60) g_ResistAmount[id] = 0.60;
 			
-			new Float:dur = 7.0 + (lvl * 0.2);
+			new Float:dur = GetSkillDuration(7.0, float(lvl), g_Player[id][g_Level], 0.22, 0.12);
+			if (dur > 16.0) dur = 16.0;
 			set_user_rendering(id, kRenderFxGlowShell, 30, 100, 255, kRenderNormal, 35);
 			set_task(dur, "RemoveResist", id);
-			apply_skill_cooldown(id, 1, 28.0);
+			apply_skill_cooldown(id, 1, 26.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Corp Rezistent: reducere damage cu ^3%.0f%% ^1timp de %.1f sec!", g_ResistAmount[id] * 100.0, dur);
 		}
 		case 2: // Izbitura - stun
@@ -1507,15 +1544,16 @@ stock skill_warrior_corporal(id, slot, lvl)
 			new target = get_aim_target(id);
 			if (is_user_alive(target))
 			{
-				new Float:stun = 1.4 + (lvl * 0.06) + (g_Player[id][g_INT] * 0.02);
+				new Float:stun = 1.4 + (lvl * 0.07) + (float(g_Player[id][g_Level]) * 0.015) + (float(get_total_str(id)) * 0.012);
+				if (stun > 3.5) stun = 3.5;
 				set_pev(target, pev_flags, pev(target, pev_flags) | FL_FROZEN);
 				set_task(stun, "Unfreeze", target);
-				apply_skill_cooldown(id, 2, 18.0);
+				apply_skill_cooldown(id, 2, 16.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Izbitura: inamic inghetat ^3%.1f secunde^1!", stun);
 			}
 			else
 			{
-				apply_skill_cooldown(id, 2, 18.0);
+				apply_skill_cooldown(id, 2, 16.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida in fata ta.");
 			}
 		}
@@ -1525,14 +1563,14 @@ stock skill_warrior_corporal(id, slot, lvl)
 			pev(id, pev_v_angle, angles);
 			angle_vector(angles, ANGLEVECTOR_FORWARD, vec);
 	
-			new Float:speed = 900.0 + (lvl * 15.0);
+			new Float:speed = 900.0 + (lvl * 18.0) + (float(g_Player[id][g_Level]) * 4.0) + (float(get_total_str(id)) * 2.0);
 			vec[0] *= speed;
 			vec[1] *= speed;
 			vec[2] = 150.0;
 	
 			set_pev(id, pev_velocity, vec);
 	
-			apply_skill_cooldown(id, 3, 14.0);
+			apply_skill_cooldown(id, 3, 12.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Atac Sabie: dash inainte!");
 		}
 		case 4: // Vartej AoE
@@ -1540,7 +1578,7 @@ stock skill_warrior_corporal(id, slot, lvl)
 			new Float:origin[3];
 			pev(id, pev_origin, origin);
 			
-			new Float:radius = 180.0 + (lvl * 3.0);
+			new Float:radius = 180.0 + (lvl * 3.5) + (float(g_Player[id][g_Level]) * 1.2);
 			new Float:dmg = 35.0 + power;
 			
 			new hit = 0;
@@ -1558,7 +1596,7 @@ stock skill_warrior_corporal(id, slot, lvl)
 					hit++;
 				}
 			}
-			apply_skill_cooldown(id, 4, 26.0);
+			apply_skill_cooldown(id, 4, 24.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Vartej Sabie: AoE %.0f dmg in raza %.0f | Inamici loviti: %d", dmg, radius, hit);
 		}
 	}
@@ -1587,30 +1625,33 @@ stock skill_sura_arme(id, slot, lvl)
 		case 0: // Tais Vrajit - damage + lifesteal simplified as damage boost
 		{
 			g_AuraActive[id] = true;
-			new Float:dur = 7.0 + (lvl * 0.2);
+			new Float:dur = GetSkillDuration(7.0, float(lvl), g_Player[id][g_Level], 0.22, 0.13);
+			if (dur > 16.0) dur = 16.0;
 			set_user_rendering(id, kRenderFxGlowShell, 180, 50, 255, kRenderNormal, 40);
 			set_task(dur, "RemoveAura", id);
-			apply_skill_cooldown(id, 0, 20.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Tais Vrajit: +damage magic (%.0f sec). Putere bazata pe INT!", dur);
+			apply_skill_cooldown(id, 0, 18.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Tais Vrajit: +damage magic (%.1f sec). Putere bazata pe INT!", dur);
 		}
 		case 1: // Reflect
 		{
 			g_ReflectActive[id] = true;
-			new Float:dur = 6.0 + (lvl * 0.18);
+			new Float:dur = GetSkillDuration(6.0, float(lvl), g_Player[id][g_Level], 0.20, 0.12);
+			if (dur > 14.0) dur = 14.0;
 			set_user_rendering(id, kRenderFxGlowShell, 255, 0, 100, kRenderNormal, 35);
 			set_task(dur, "RemoveReflect", id);
-			apply_skill_cooldown(id, 1, 32.0);
+			apply_skill_cooldown(id, 1, 28.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Armura Vrajita: reflecti ^335%% ^1din damage-ul primit timp de %.1f sec!", dur);
 		}
 		case 2: // Armor Pierce - real pierce
 		{
 			g_PierceActive[id] = true;
-			g_PierceAmount[id] = 0.35 + (float(lvl) * 0.01) + (float(g_Player[id][g_INT]) * 0.005);
-			if (g_PierceAmount[id] > 0.70) g_PierceAmount[id] = 0.70;
+			g_PierceAmount[id] = 0.35 + (float(lvl) * 0.011) + (float(get_total_int(id)) * 0.006) + (float(g_Player[id][g_Level]) * 0.002);
+			if (g_PierceAmount[id] > 0.75) g_PierceAmount[id] = 0.75;
 			
-			new Float:dur = 6.0 + (lvl * 0.15);
+			new Float:dur = GetSkillDuration(6.0, float(lvl), g_Player[id][g_Level], 0.18, 0.10);
+			if (dur > 12.0) dur = 12.0;
 			set_task(dur, "RemovePierce", id);
-			apply_skill_cooldown(id, 2, 16.0);
+			apply_skill_cooldown(id, 2, 14.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Lovitura Degetului (Armor Pierce): ignori ^3%.0f%% ^1din apararea inamicului timp de %.1f sec!", g_PierceAmount[id] * 100.0, dur);
 		}
 		case 3: // Slow
@@ -1618,15 +1659,16 @@ stock skill_sura_arme(id, slot, lvl)
 			new target = get_aim_target(id);
 			if (is_user_alive(target))
 			{
-				new Float:slow_dur = 3.5 + (lvl * 0.1);
+				new Float:slow_dur = 3.5 + (lvl * 0.12) + (float(g_Player[id][g_Level]) * 0.04) + (float(get_total_int(id)) * 0.02);
+				if (slow_dur > 7.0) slow_dur = 7.0;
 				set_user_maxspeed(target, 110.0);
 				set_task(slow_dur, "RestoreSpeed", target);
-				apply_skill_cooldown(id, 3, 18.0);
+				apply_skill_cooldown(id, 3, 16.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Atacul Fulgerului: tinta incetinita la 110 speed timp de ^3%.1f sec^1!", slow_dur);
 			}
 			else
 			{
-				apply_skill_cooldown(id, 3, 18.0);
+				apply_skill_cooldown(id, 3, 16.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
 			}
 		}
@@ -1635,19 +1677,20 @@ stock skill_sura_arme(id, slot, lvl)
 			new target = get_aim_target(id);
 			if (is_user_alive(target))
 			{
-				new Float:stun = 1.8 + (lvl * 0.05) + (g_Player[id][g_INT] * 0.03);
+				new Float:stun = 1.8 + (lvl * 0.06) + (float(get_total_int(id)) * 0.025) + (float(g_Player[id][g_Level]) * 0.02);
+				if (stun > 4.0) stun = 4.0;
 				set_pev(target, pev_flags, pev(target, pev_flags) | FL_FROZEN);
 				set_task(stun, "Unfreeze", target);
 				
 				// After unfreeze, residual slow
 				set_task(stun + 0.1, "ApplyResidualSlow", target);
 				
-				apply_skill_cooldown(id, 4, 38.0);
+				apply_skill_cooldown(id, 4, 34.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Pietrificare: inamicul este ^3pietrificat %.1f sec^1 + slow ulterior!", stun);
 			}
 			else
 			{
-				apply_skill_cooldown(id, 4, 38.0);
+				apply_skill_cooldown(id, 4, 34.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida pentru Pietrificare.");
 			}
 		}
@@ -1776,29 +1819,34 @@ public cmd_reset(id)
 // ---------- NINJA ----------
 stock skill_ninja_lame(id, slot, lvl)
 {
+	// DEX dominant
+	new Float:power = float(lvl) * 2.0 + float(g_Player[id][g_Level]) * 0.9 + float(get_total_dex(id)) * 2.1 + float(get_total_int(id)) * 0.35;
+
 	switch (slot)
 	{
 		case 0: // Camuflaj
 		{
-			new Float:dur = 4.5 + (lvl * 0.18) + (g_Player[id][g_INT] * 0.05);
+			new Float:dur = GetSkillDuration(4.5, float(lvl), g_Player[id][g_Level], 0.20, 0.10);
+			if (dur > 12.0) dur = 12.0;
 			set_user_rendering(id, kRenderFxNone, 0, 0, 0, kRenderTransAlpha, 8);
 			set_task(dur, "RemoveInvis", id);
-			apply_skill_cooldown(id, 0, 28.0);
+			apply_skill_cooldown(id, 0, 24.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Camuflaj: esti aproape invizibil timp de ^3%.1f secunde^1!", dur);
 		}
 		case 1: // Speed
 		{
-			new Float:spd = 420.0 + (lvl * 6.0) + (g_Player[id][g_DEX] * 2.0);
+			new Float:spd = 420.0 + (lvl * 7.0) + (float(get_total_dex(id)) * 2.5) + (float(g_Player[id][g_Level]) * 3.0);
 			set_user_maxspeed(id, spd);
-			new Float:dur = 6.0 + (lvl * 0.1);
+			new Float:dur = GetSkillDuration(6.0, float(lvl), g_Player[id][g_Level], 0.15, 0.10);
+			if (dur > 12.0) dur = 12.0;
 			set_task(dur, "RestoreSpeed", id);
-			apply_skill_cooldown(id, 1, 22.0);
+			apply_skill_cooldown(id, 1, 18.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Atacul Fulgerator: viteza crescuta la ^3%.0f ^1timp de %.1f sec!", spd, dur);
 		}
 		case 2: // Ambush
 		{
 			g_AmbushActive[id] = true;
-			apply_skill_cooldown(id, 2, 18.0);
+			apply_skill_cooldown(id, 2, 15.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Ambush pregatit! Urmatorul atac va fi ^3CRITIC x3^1.");
 		}
 		case 3: // Poison
@@ -1807,14 +1855,15 @@ stock skill_ninja_lame(id, slot, lvl)
 			if (is_user_alive(target))
 			{
 				new taskid = (id * 100) + target;
-				new ticks = 4 + (lvl / 6);
+				new ticks = 4 + (lvl / 5) + (g_Player[id][g_Level] / 20);
+				if (ticks > 12) ticks = 12;
 				set_task(1.0, "PoisonTick", taskid, _, _, "a", ticks);
-				apply_skill_cooldown(id, 3, 20.0);
+				apply_skill_cooldown(id, 3, 17.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Otrava: DoT pe tinta (%d tick-uri de poison)!", ticks);
 			}
 			else
 			{
-				apply_skill_cooldown(id, 3, 20.0);
+				apply_skill_cooldown(id, 3, 17.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
 			}
 		}
@@ -1823,7 +1872,7 @@ stock skill_ninja_lame(id, slot, lvl)
 			new Float:origin[3];
 			pev(id, pev_origin, origin);
 			
-			new Float:dmg = 28.0 + float(lvl) * 2.2 + float(g_Player[id][g_INT]) * 0.7;
+			new Float:dmg = 28.0 + power;
 			
 			new hit = 0;
 			for (new i = 1; i <= MaxClients; i++)
@@ -1834,13 +1883,13 @@ stock skill_ninja_lame(id, slot, lvl)
 				new Float:torigin[3];
 				pev(i, pev_origin, torigin);
 				
-				if (get_distance_f(origin, torigin) < 250.0)
+				if (get_distance_f(origin, torigin) < 250.0 + float(lvl) * 2.0)
 				{
 					ExecuteHamB(Ham_TakeDamage, i, id, id, dmg, DMG_BULLET);
 					hit++;
 				}
 			}
-			apply_skill_cooldown(id, 4, 30.0);
+			apply_skill_cooldown(id, 4, 26.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Ploaie de Sageti: AoE %.0f dmg | Inamici loviti: %d", dmg, hit);
 		}
 	}
@@ -1849,7 +1898,8 @@ stock skill_ninja_lame(id, slot, lvl)
 // ---------- SHAMAN ----------
 stock skill_shaman_zmeu(id, slot, lvl)
 {
-	new Float:power = float(lvl) * 2.2 + float(g_Player[id][g_INT]) * 1.15;
+	// INT dominant
+	new Float:power = float(lvl) * 2.2 + float(g_Player[id][g_Level]) * 1.0 + float(get_total_int(id)) * 1.9 + float(get_total_str(id)) * 0.25;
 	
 	switch (slot)
 	{
@@ -1859,8 +1909,8 @@ stock skill_shaman_zmeu(id, slot, lvl)
 			new Float:origin[3];
 			pev(id, pev_origin, origin);
 			
-			new Float:radius = 220.0 + (lvl * 3.0);
-			new Float:dmg = 35.0 + power * 0.9;
+			new Float:radius = 220.0 + (lvl * 3.5) + (float(g_Player[id][g_Level]) * 1.5);
+			new Float:dmg = 35.0 + power * 0.95;
 			new hit = 0;
 			
 			for (new i = 1; i <= MaxClients; i++)
@@ -1878,46 +1928,47 @@ stock skill_shaman_zmeu(id, slot, lvl)
 				}
 			}
 			
-			apply_skill_cooldown(id, 0, 16.0);
+			apply_skill_cooldown(id, 0, 14.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Chemarea Dragonului: ^3%.0f^1 dmg foc pe %d inamici!", dmg, hit);
 		}
 		
-		// 1 - Flacara Dragonului: damage mare single-target + mic DoT vizual (instant heavy hit)
+		// 1 - Flacara Dragonului: damage mare single-target
 		case 1:
 		{
 			new target = get_aim_target(id);
 			if (is_user_alive(target))
 			{
-				new Float:dmg = 55.0 + power * 1.1;
+				new Float:dmg = 55.0 + power * 1.15;
 				ExecuteHamB(Ham_TakeDamage, target, id, id, dmg, DMG_BURN);
-				apply_skill_cooldown(id, 1, 14.0);
+				apply_skill_cooldown(id, 1, 12.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Flacara Dragonului: ^3%.0f^1 dmg foc!", dmg);
 			}
 			else
 			{
-				apply_skill_cooldown(id, 1, 14.0);
+				apply_skill_cooldown(id, 1, 12.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
 			}
 		}
 		
-		// 2 - Scut de Solzi: reducere damage (folosește sistemul de resist existent)
+		// 2 - Scut de Solzi: reducere damage (HP + INT)
 		case 2:
 		{
 			g_ResistActive[id] = true;
-			g_ResistAmount[id] = 0.28 + (float(lvl) * 0.006);
-			if (g_ResistAmount[id] > 0.48) g_ResistAmount[id] = 0.48;
+			g_ResistAmount[id] = 0.28 + (float(lvl) * 0.007) + (float(get_total_hp(id)) * 0.0025) + (float(g_Player[id][g_Level]) * 0.0015);
+			if (g_ResistAmount[id] > 0.55) g_ResistAmount[id] = 0.55;
 			
-			new Float:dur = 7.0 + (lvl * 0.18);
+			new Float:dur = GetSkillDuration(7.0, float(lvl), g_Player[id][g_Level], 0.20, 0.12);
+			if (dur > 15.0) dur = 15.0;
 			set_user_rendering(id, kRenderFxGlowShell, 255, 140, 40, kRenderNormal, 40);
 			set_task(dur, "RemoveResist", id);
-			apply_skill_cooldown(id, 2, 26.0);
+			apply_skill_cooldown(id, 2, 22.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Scut de Solzi: reducere damage ^3%.0f%%^1 timp de %.1f sec!", g_ResistAmount[id]*100.0, dur);
 		}
 		
 		// 3 - Zborul Dragonului: boost de viteză
 		case 3:
 		{
-			new Float:speed = 280.0 + (lvl * 1.5) + float(g_Player[id][g_DEX]) * 0.4;
+			new Float:speed = 280.0 + (lvl * 2.0) + float(get_total_dex(id)) * 0.6 + float(g_Player[id][g_Level]) * 1.5;
 			// bonus din papuci
 			for (new i = 0; i < MAX_EQUIP_SLOTS; i++)
 			{
@@ -1927,9 +1978,10 @@ stock skill_shaman_zmeu(id, slot, lvl)
 			}
 			
 			set_user_maxspeed(id, speed);
-			new Float:dur = 6.0 + (lvl * 0.12);
+			new Float:dur = GetSkillDuration(6.0, float(lvl), g_Player[id][g_Level], 0.15, 0.10);
+			if (dur > 12.0) dur = 12.0;
 			set_task(dur, "RestoreSpeed", id);
-			apply_skill_cooldown(id, 3, 22.0);
+			apply_skill_cooldown(id, 3, 18.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Zborul Dragonului: viteza crescuta timp de ^3%.1f sec^1!", dur);
 		}
 		
@@ -1937,14 +1989,15 @@ stock skill_shaman_zmeu(id, slot, lvl)
 		case 4:
 		{
 			g_AuraActive[id] = true;
-			new Float:dur = 7.5 + (lvl * 0.16);
+			new Float:dur = GetSkillDuration(7.5, float(lvl), g_Player[id][g_Level], 0.20, 0.13);
+			if (dur > 16.0) dur = 16.0;
 			set_user_rendering(id, kRenderFxGlowShell, 255, 60, 0, kRenderNormal, 45);
 			set_task(dur, "RemoveAura", id);
 			
 			// mic burst AoE la activare
 			new Float:origin[3];
 			pev(id, pev_origin, origin);
-			new Float:burst = 25.0 + power * 0.5;
+			new Float:burst = 25.0 + power * 0.55;
 			
 			for (new i = 1; i <= MaxClients; i++)
 			{
@@ -1954,11 +2007,11 @@ stock skill_shaman_zmeu(id, slot, lvl)
 				new Float:torigin[3];
 				pev(i, pev_origin, torigin);
 				
-				if (get_distance_f(origin, torigin) < 180.0)
+				if (get_distance_f(origin, torigin) < 180.0 + float(lvl) * 2.0)
 					ExecuteHamB(Ham_TakeDamage, i, id, id, burst, DMG_BURN);
 			}
 			
-			apply_skill_cooldown(id, 4, 34.0);
+			apply_skill_cooldown(id, 4, 30.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Furia Dragonului: +damage + burst foc timp de ^3%.1f sec^1!", dur);
 		}
 	}
@@ -1967,7 +2020,8 @@ stock skill_shaman_zmeu(id, slot, lvl)
 // ======================== WARRIOR - MENTAL ========================
 stock skill_warrior_mental(id, slot, lvl)
 {
-	new Float:power = float(lvl) * 1.6 + float(g_Player[id][g_INT]) * 0.9;
+	// STR + INT mix (Mental path)
+	new Float:power = float(lvl) * 2.0 + float(g_Player[id][g_Level]) * 1.0 + float(get_total_str(id)) * 1.2 + float(get_total_int(id)) * 1.1;
 	
 	switch (slot)
 	{
@@ -1978,25 +2032,26 @@ stock skill_warrior_mental(id, slot, lvl)
 			{
 				new Float:dmg = 40.0 + power;
 				ExecuteHamB(Ham_TakeDamage, target, id, id, dmg, DMG_ENERGYBEAM);
-				apply_skill_cooldown(id, 0, 16.0);
+				apply_skill_cooldown(id, 0, 14.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Lovitura Spiritului: ^3%.0f^1 damage magic!", dmg);
 			}
 			else
 			{
-				apply_skill_cooldown(id, 0, 16.0);
+				apply_skill_cooldown(id, 0, 14.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
 			}
 		}
-		case 1: // Scut Mental - absorb damage
+		case 1: // Scut Mental - absorb damage (HP + INT)
 		{
 			g_ResistActive[id] = true;
-			g_ResistAmount[id] = 0.30 + (float(lvl) * 0.007);
-			if (g_ResistAmount[id] > 0.50) g_ResistAmount[id] = 0.50;
+			g_ResistAmount[id] = 0.30 + (float(lvl) * 0.008) + (float(get_total_hp(id)) * 0.0025) + (float(g_Player[id][g_Level]) * 0.0015);
+			if (g_ResistAmount[id] > 0.58) g_ResistAmount[id] = 0.58;
 			
-			new Float:dur = 6.5 + (lvl * 0.18);
+			new Float:dur = GetSkillDuration(6.5, float(lvl), g_Player[id][g_Level], 0.20, 0.12);
+			if (dur > 14.0) dur = 14.0;
 			set_user_rendering(id, kRenderFxGlowShell, 100, 100, 255, kRenderNormal, 35);
 			set_task(dur, "RemoveResist", id);
-			apply_skill_cooldown(id, 1, 26.0);
+			apply_skill_cooldown(id, 1, 22.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Scut Mental: reducere damage ^3%.0f%%^1 timp de %.1f sec!", g_ResistAmount[id]*100.0, dur);
 		}
 		case 2: // Valul de Putere - AoE knockback + small dmg
@@ -2004,8 +2059,8 @@ stock skill_warrior_mental(id, slot, lvl)
 			new Float:origin[3];
 			pev(id, pev_origin, origin);
 			
-			new Float:radius = 200.0 + (lvl * 2.5);
-			new Float:dmg = 25.0 + power * 0.7;
+			new Float:radius = 200.0 + (lvl * 3.0) + (float(g_Player[id][g_Level]) * 1.2);
+			new Float:dmg = 25.0 + power * 0.75;
 			new hit = 0;
 			
 			for (new i = 1; i <= MaxClients; i++)
@@ -2029,18 +2084,19 @@ stock skill_warrior_mental(id, slot, lvl)
 					hit++;
 				}
 			}
-			apply_skill_cooldown(id, 2, 22.0);
+			apply_skill_cooldown(id, 2, 18.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Valul de Putere: %d inamici loviti!", hit);
 		}
-		case 3: // Concentrare - buff damage + crit chance (folosim AmbushActive ca flag)
+		case 3: // Concentrare - buff damage + crit chance
 		{
-			g_AmbushActive[id] = true; // reutilizăm flag-ul pentru următorul hit x2
+			g_AmbushActive[id] = true;
 			g_AuraActive[id] = true;
-			new Float:dur = 7.0 + (lvl * 0.2);
+			new Float:dur = GetSkillDuration(7.0, float(lvl), g_Player[id][g_Level], 0.22, 0.13);
+			if (dur > 15.0) dur = 15.0;
 			set_user_rendering(id, kRenderFxGlowShell, 180, 180, 255, kRenderNormal, 40);
 			set_task(dur, "RemoveAura", id);
-			apply_skill_cooldown(id, 3, 20.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Concentrare: +damage + urmatorul atac CRIT x2 (%.0f sec)!", dur);
+			apply_skill_cooldown(id, 3, 17.0);
+			client_print_color(id, print_team_default, "^4[Metin2]^1 Concentrare: +damage + urmatorul atac CRIT x2 (%.1f sec)!", dur);
 		}
 		case 4: // Explozie Interioara - self damage + big AoE
 		{
@@ -2061,13 +2117,13 @@ stock skill_warrior_mental(id, slot, lvl)
 				new Float:torigin[3];
 				pev(i, pev_origin, torigin);
 				
-				if (get_distance_f(origin, torigin) < 230.0)
+				if (get_distance_f(origin, torigin) < 230.0 + float(lvl) * 2.0)
 				{
 					ExecuteHamB(Ham_TakeDamage, i, id, id, dmg, DMG_BLAST);
 					hit++;
 				}
 			}
-			apply_skill_cooldown(id, 4, 30.0);
+			apply_skill_cooldown(id, 4, 26.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Explozie Interioara: AoE %.0f dmg | Inamici: %d", dmg, hit);
 		}
 	}
@@ -2076,7 +2132,8 @@ stock skill_warrior_mental(id, slot, lvl)
 // ======================== SURA - MAGIE NEAGRA ========================
 stock skill_sura_neagra(id, slot, lvl)
 {
-	new Float:power = float(lvl) * 1.7 + float(g_Player[id][g_INT]) * 1.0;
+	// INT dominant
+	new Float:power = float(lvl) * 2.0 + float(g_Player[id][g_Level]) * 1.0 + float(get_total_int(id)) * 1.9 + float(get_total_str(id)) * 0.3;
 	
 	switch (slot)
 	{
@@ -2085,39 +2142,42 @@ stock skill_sura_neagra(id, slot, lvl)
 			new target = get_aim_target(id);
 			if (is_user_alive(target))
 			{
-				new Float:dmg = 30.0 + power * 0.8;
+				new Float:dmg = 30.0 + power * 0.85;
 				ExecuteHamB(Ham_TakeDamage, target, id, id, dmg, DMG_BURN);
 				
-				new taskid = (id * 100) + target + 5000; // offset ca să nu se ciocnească cu PoisonTick
-				set_task(1.0, "DarkFlameTick", taskid, _, _, "a", 4 + (lvl / 8));
+				new taskid = (id * 100) + target + 5000;
+				new ticks = 4 + (lvl / 6) + (g_Player[id][g_Level] / 25);
+				if (ticks > 10) ticks = 10;
+				set_task(1.0, "DarkFlameTick", taskid, _, _, "a", ticks);
 				
-				apply_skill_cooldown(id, 0, 18.0);
+				apply_skill_cooldown(id, 0, 15.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Flacara Intunecata: damage + DoT!");
 			}
 			else
 			{
-				apply_skill_cooldown(id, 0, 18.0);
+				apply_skill_cooldown(id, 0, 15.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
 			}
 		}
-		case 1: // Blestem - reduce stats inamic (speed + damage reduction pe el)
+		case 1: // Blestem - reduce stats inamic
 		{
 			new target = get_aim_target(id);
 			if (is_user_alive(target))
 			{
+				new Float:slow_dur = 4.0 + (lvl * 0.14) + (float(g_Player[id][g_Level]) * 0.05) + (float(get_total_int(id)) * 0.02);
+				if (slow_dur > 8.0) slow_dur = 8.0;
 				set_user_maxspeed(target, 130.0);
-				set_task(4.0 + (lvl * 0.12), "RestoreSpeed", target);
+				set_task(slow_dur, "RestoreSpeed", target);
 				
-				// mic debuff de damage (folosim Reflect ca flag temporar pe victimă)
-				g_ReflectActive[target] = true; // o să-l folosim invers în OnTakeDamage dacă vrei
-				set_task(5.0, "RemoveReflect", target);
+				g_ReflectActive[target] = true;
+				set_task(slow_dur + 0.5, "RemoveReflect", target);
 				
-				apply_skill_cooldown(id, 1, 24.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Blestem: tinta incetinita + debuff!");
+				apply_skill_cooldown(id, 1, 20.0);
+				client_print_color(id, print_team_default, "^4[Metin2]^1 Blestem: tinta incetinita + debuff (%.1f sec)!", slow_dur);
 			}
 			else
 			{
-				apply_skill_cooldown(id, 1, 24.0);
+				apply_skill_cooldown(id, 1, 20.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
 			}
 		}
@@ -2126,30 +2186,31 @@ stock skill_sura_neagra(id, slot, lvl)
 			new target = get_aim_target(id);
 			if (is_user_alive(target))
 			{
-				new Float:dmg = 35.0 + power * 0.9;
+				new Float:dmg = 35.0 + power * 0.95;
 				ExecuteHamB(Ham_TakeDamage, target, id, id, dmg, DMG_ENERGYBEAM);
 				
-				new heal = floatround(dmg * 0.45);
+				new heal = floatround(dmg * 0.48);
 				new hp = get_user_health(id);
 				set_user_health(id, min(hp + heal, 100 + g_Player[id][g_HP] * 10 + 80));
 				
-				apply_skill_cooldown(id, 2, 17.0);
+				apply_skill_cooldown(id, 2, 14.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Absorbție de Suflet: %.0f dmg + %d HP!", dmg, heal);
 			}
 			else
 			{
-				apply_skill_cooldown(id, 2, 17.0);
+				apply_skill_cooldown(id, 2, 14.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
 			}
 		}
 		case 3: // Umbre - invis + speed
 		{
-			new Float:dur = 4.0 + (lvl * 0.15);
+			new Float:dur = GetSkillDuration(4.0, float(lvl), g_Player[id][g_Level], 0.18, 0.10);
+			if (dur > 11.0) dur = 11.0;
 			set_user_rendering(id, kRenderFxNone, 0, 0, 0, kRenderTransAlpha, 15);
-			set_user_maxspeed(id, 380.0 + (lvl * 4.0));
+			set_user_maxspeed(id, 380.0 + (lvl * 5.0) + (float(g_Player[id][g_Level]) * 2.0));
 			set_task(dur, "RemoveInvis", id);
 			set_task(dur, "RestoreSpeed", id);
-			apply_skill_cooldown(id, 3, 26.0);
+			apply_skill_cooldown(id, 3, 22.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Umbre: aproape invizibil + viteza (%.1f sec)!", dur);
 		}
 		case 4: // Invocarea Haosului - big AoE dark
@@ -2168,13 +2229,13 @@ stock skill_sura_neagra(id, slot, lvl)
 				new Float:torigin[3];
 				pev(i, pev_origin, torigin);
 				
-				if (get_distance_f(origin, torigin) < 260.0)
+				if (get_distance_f(origin, torigin) < 260.0 + float(lvl) * 2.5)
 				{
 					ExecuteHamB(Ham_TakeDamage, i, id, id, dmg, DMG_ENERGYBEAM);
 					hit++;
 				}
 			}
-			apply_skill_cooldown(id, 4, 34.0);
+			apply_skill_cooldown(id, 4, 28.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Invocarea Haosului: AoE %.0f dmg | Inamici: %d", dmg, hit);
 		}
 	}
@@ -2186,17 +2247,18 @@ public DarkFlameTick(taskid)
 	new target = (taskid - 5000) % 100;
 	
 	if (is_user_alive(target) && is_user_connected(attacker))
-		ExecuteHamB(Ham_TakeDamage, target, attacker, attacker, 8.0 + float(g_Player[attacker][g_INT]) * 0.25, DMG_BURN);
+		ExecuteHamB(Ham_TakeDamage, target, attacker, attacker, 8.0 + float(get_total_int(attacker)) * 0.35 + float(g_Player[attacker][g_Level]) * 0.15, DMG_BURN);
 }
 
 // ======================== NINJA - ARC ========================
 stock skill_ninja_arc(id, slot, lvl)
 {
-	new Float:power = float(lvl) * 1.9 + float(g_Player[id][g_DEX]) * 0.7 + float(g_Player[id][g_INT]) * 0.4;
+	// DEX dominant
+	new Float:power = float(lvl) * 2.1 + float(g_Player[id][g_Level]) * 0.95 + float(get_total_dex(id)) * 2.0 + float(get_total_int(id)) * 0.4;
 	
 	switch (slot)
 	{
-		case 0: // Ploaie de Sageti (deja exista pe Path A, dar aici o facem mai puternică pe Arc)
+		case 0: // Ploaie de Sageti
 		{
 			new Float:origin[3];
 			pev(id, pev_origin, origin);
@@ -2212,13 +2274,13 @@ stock skill_ninja_arc(id, slot, lvl)
 				new Float:torigin[3];
 				pev(i, pev_origin, torigin);
 				
-				if (get_distance_f(origin, torigin) < 280.0)
+				if (get_distance_f(origin, torigin) < 280.0 + float(lvl) * 2.5)
 				{
 					ExecuteHamB(Ham_TakeDamage, i, id, id, dmg, DMG_BULLET);
 					hit++;
 				}
 			}
-			apply_skill_cooldown(id, 0, 22.0);
+			apply_skill_cooldown(id, 0, 18.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Ploaie de Sageti: %.0f dmg | Inamici: %d", dmg, hit);
 		}
 		case 1: // Sageata Exploziva
@@ -2240,23 +2302,23 @@ stock skill_ninja_arc(id, slot, lvl)
 					
 					new Float:o[3];
 					pev(i, pev_origin, o);
-					if (get_distance_f(torigin, o) < 150.0)
+					if (get_distance_f(torigin, o) < 150.0 + float(lvl) * 1.5)
 						ExecuteHamB(Ham_TakeDamage, i, id, id, dmg * 0.5, DMG_BLAST);
 				}
 				
-				apply_skill_cooldown(id, 1, 19.0);
+				apply_skill_cooldown(id, 1, 16.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Sageata Exploziva: %.0f dmg + AoE!", dmg);
 			}
 			else
 			{
-				apply_skill_cooldown(id, 1, 19.0);
+				apply_skill_cooldown(id, 1, 16.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
 			}
 		}
 		case 2: // Tintire Precisa - next hit guaranteed high damage
 		{
 			g_AmbushActive[id] = true; // x3 crit
-			apply_skill_cooldown(id, 2, 15.0);
+			apply_skill_cooldown(id, 2, 12.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Tintire Precisa: urmatorul atac este CRITIC x3!");
 		}
 		case 3: // Sageata Otravita
@@ -2265,15 +2327,16 @@ stock skill_ninja_arc(id, slot, lvl)
 			if (is_user_alive(target))
 			{
 				new taskid = (id * 100) + target;
-				new ticks = 5 + (lvl / 5);
+				new ticks = 5 + (lvl / 4) + (g_Player[id][g_Level] / 20);
+				if (ticks > 14) ticks = 14;
 				set_task(1.0, "PoisonTick", taskid, _, _, "a", ticks);
 				
-				apply_skill_cooldown(id, 3, 18.0);
+				apply_skill_cooldown(id, 3, 15.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Sageata Otravita: DoT puternic (%d tick-uri)!", ticks);
 			}
 			else
 			{
-				apply_skill_cooldown(id, 3, 18.0);
+				apply_skill_cooldown(id, 3, 15.0);
 				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
 			}
 		}
@@ -2282,7 +2345,7 @@ stock skill_ninja_arc(id, slot, lvl)
 			new Float:origin[3];
 			pev(id, pev_origin, origin);
 			
-			new Float:dmg = 22.0 + power * 0.6;
+			new Float:dmg = 22.0 + power * 0.65;
 			new hit = 0;
 			
 			for (new i = 1; i <= MaxClients; i++)
@@ -2293,13 +2356,13 @@ stock skill_ninja_arc(id, slot, lvl)
 				new Float:torigin[3];
 				pev(i, pev_origin, torigin);
 				
-				if (get_distance_f(origin, torigin) < 320.0)
+				if (get_distance_f(origin, torigin) < 320.0 + float(lvl) * 2.0)
 				{
 					ExecuteHamB(Ham_TakeDamage, i, id, id, dmg, DMG_BULLET);
 					hit++;
 				}
 			}
-			apply_skill_cooldown(id, 4, 28.0);
+			apply_skill_cooldown(id, 4, 24.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Val de Sageti: %.0f dmg | Inamici: %d", dmg, hit);
 		}
 	}
@@ -2308,13 +2371,14 @@ stock skill_ninja_arc(id, slot, lvl)
 // ======================== SHAMAN - FULGER / VINDECARE ========================
 stock skill_shaman_fulger(id, slot, lvl)
 {
-	new Float:power = float(lvl) * 2.0 + float(g_Player[id][g_INT]) * 1.2;
+	// INT dominant
+	new Float:power = float(lvl) * 2.2 + float(g_Player[id][g_Level]) * 1.1 + float(get_total_int(id)) * 1.95 + float(get_total_hp(id)) * 0.15;
 	
 	switch (slot)
 	{
-		case 0: // Lecuire (varianta mai puternică)
+		case 0: // Lecuire
 		{
-			new heal = 55 + floatround(power);
+			new heal = 55 + floatround(power * 0.9);
 			new hp = get_user_health(id);
 			new maxhp = 100 + g_Player[id][g_HP] * 10;
 			
@@ -2326,27 +2390,29 @@ stock skill_shaman_fulger(id, slot, lvl)
 			}
 			
 			set_user_health(id, min(hp + heal, maxhp));
-			apply_skill_cooldown(id, 0, 12.0);
+			apply_skill_cooldown(id, 0, 10.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Lecuire: +%d HP!", heal);
 		}
 		case 1: // Atac Intens
 		{
 			g_AuraActive[id] = true;
-			new Float:dur = 8.5 + (lvl * 0.18);
+			new Float:dur = GetSkillDuration(8.5, float(lvl), g_Player[id][g_Level], 0.22, 0.14);
+			if (dur > 18.0) dur = 18.0;
 			set_user_rendering(id, kRenderFxGlowShell, 255, 220, 50, kRenderNormal, 40);
 			set_task(dur, "RemoveAura", id);
-			apply_skill_cooldown(id, 1, 30.0);
+			apply_skill_cooldown(id, 1, 26.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Atac Intens: +damage (%.1f sec)!", dur);
 		}
 		case 2: // Binecuvantare
 		{
 			g_BlessActive[id] = true;
-			g_BlessAmount[id] = 18.0 + (float(lvl) * 1.4) + (float(g_Player[id][g_INT]) * 0.9);
+			g_BlessAmount[id] = 18.0 + (float(lvl) * 1.6) + (float(get_total_int(id)) * 1.1) + (float(g_Player[id][g_Level]) * 0.4);
 			
-			new Float:dur = 10.0 + (lvl * 0.22);
+			new Float:dur = GetSkillDuration(10.0, float(lvl), g_Player[id][g_Level], 0.25, 0.15);
+			if (dur > 20.0) dur = 20.0;
 			set_user_rendering(id, kRenderFxGlowShell, 80, 255, 120, kRenderNormal, 35);
 			set_task(dur, "RemoveBless", id);
-			apply_skill_cooldown(id, 2, 26.0);
+			apply_skill_cooldown(id, 2, 22.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Binecuvantare: +%.0f defense (%.1f sec)!", g_BlessAmount[id], dur);
 		}
 		case 3: // Iutesenie - reset CD
@@ -2354,7 +2420,10 @@ stock skill_shaman_fulger(id, slot, lvl)
 			for (new i = 0; i < 5; i++)
 				g_SkillCooldown[id][i] = 0.0;
 			
-			apply_skill_cooldown(id, 3, 50.0);
+			// CD-ul pe Iutesenie scade puțin cu level
+			new Float:base_cd = 50.0 - (float(g_Player[id][g_Level]) * 0.15) - (float(lvl) * 0.2);
+			if (base_cd < 35.0) base_cd = 35.0;
+			apply_skill_cooldown(id, 3, base_cd);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Iutesenie: toate cooldown-urile resetate!");
 		}
 		case 4: // Chemarea Fulgerului
@@ -2372,7 +2441,7 @@ stock skill_shaman_fulger(id, slot, lvl)
 			write_byte(200);
 			message_end();
 			
-			new Float:radius = 220.0 + (lvl * 2.5);
+			new Float:radius = 220.0 + (lvl * 3.0) + (float(g_Player[id][g_Level]) * 1.2);
 			new stunned = 0;
 			
 			for (new i = 1; i <= MaxClients; i++)
@@ -2385,19 +2454,21 @@ stock skill_shaman_fulger(id, slot, lvl)
 				
 				if (get_distance_f(origin, torigin) < radius)
 				{
-					if (random_num(1, 100) <= (30 + lvl / 2))
+					if (random_num(1, 100) <= (30 + lvl / 2 + g_Player[id][g_Level] / 10))
 					{
+						new Float:stun_time = 1.4 + (lvl * 0.05) + (float(g_Player[id][g_Level]) * 0.015);
+						if (stun_time > 3.0) stun_time = 3.0;
 						set_pev(i, pev_flags, pev(i, pev_flags) | FL_FROZEN);
-						set_task(1.4 + (lvl * 0.04), "Unfreeze", i);
+						set_task(stun_time, "Unfreeze", i);
 						stunned++;
 					}
 					
 					// mic damage de fulger
-					ExecuteHamB(Ham_TakeDamage, i, id, id, 20.0 + power * 0.4, DMG_SHOCK);
+					ExecuteHamB(Ham_TakeDamage, i, id, id, 20.0 + power * 0.45, DMG_SHOCK);
 				}
 			}
 			
-			apply_skill_cooldown(id, 4, 30.0);
+			apply_skill_cooldown(id, 4, 26.0);
 			client_print_color(id, print_team_default, "^4[Metin2]^1 Chemarea Fulgerului: flash + stun (%d)!", stunned);
 		}
 	}
@@ -2446,7 +2517,7 @@ public PoisonTick(taskid)
 	new target = taskid % 100;
 	
 	if (is_user_alive(target) && is_user_connected(attacker))
-		ExecuteHamB(Ham_TakeDamage, target, attacker, attacker, 9.0 + float(g_Player[attacker][g_INT]) * 0.3, DMG_POISON);
+		ExecuteHamB(Ham_TakeDamage, target, attacker, attacker, 9.0 + float(get_total_dex(attacker)) * 0.25 + float(get_total_int(attacker)) * 0.2 + float(g_Player[attacker][g_Level]) * 0.12, DMG_POISON);
 }
 
 stock get_aim_target(id)
