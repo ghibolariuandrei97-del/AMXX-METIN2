@@ -14,7 +14,7 @@
 3. Setati cvar-ul sv_maxspeed din amxx.cfg ca anumite puteri de speed sa functioneze.
 
 --------------------------------------------------------------------------------
-[1] DESPRE MOD
+[1] DESPRE MOD   /   Tutorial complet pentru Playeri: https://elegant-marshmallow-424909.netlify.app/
 --------------------------------------------------------------------------------
 Metin2 RPG Core transformă serverul clasic de Counter-Strike 1.6 într-un RPG
 complet inspirat din Metin2.
