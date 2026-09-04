@@ -8,8 +8,8 @@
 /**
  * ============================================================
  *  Metin2 Stones System
- *  Sprite diferit pe fiecare level + Glow
- *  Versiune: 1.1
+ *  Model unic (metin2_stone.mdl) + Glow + Efecte diferite pe level
+ *  Versiune: 1.2
  * ============================================================
  */
 
@@ -26,16 +26,19 @@
 
 #define REQUIRE_RACE            1
 
-// Bounding box
-#define STONE_MINS              {-20.0, -20.0, -5.0}
-#define STONE_MAXS              {20.0, 20.0, 50.0}
+// Bounding box (Z jos un pic sub origin, ca să nu plutească collision-ul prea sus)
+#define STONE_MINS              {-18.0, -18.0, -10.0}
+#define STONE_MAXS              {18.0, 18.0, 55.0}
+
+// Cât de mult plutește deasupra solului (unități)
+#define STONE_FLOAT_HEIGHT      42.0
 
 // ============================================================
 //                   LEVEL 1 - Metin of the Plains
 // ============================================================
-#define STONE_L1_HP             1200
-#define STONE_L1_XP             200
-#define STONE_L1_YANG           800
+#define STONE_L1_HP             2500
+#define STONE_L1_XP             3000
+#define STONE_L1_YANG           3000
 #define STONE_L1_NAME           "Metin of the Plains"
 #define STONE_L1_SPAWN_CHANCE   40
 #define STONE_L1_SCALE          0.9
@@ -46,9 +49,9 @@
 // ============================================================
 //                   LEVEL 2 - Metin of the Forest
 // ============================================================
-#define STONE_L2_HP             2800
-#define STONE_L2_XP             300
-#define STONE_L2_YANG           1800
+#define STONE_L2_HP             5000
+#define STONE_L2_XP             7000
+#define STONE_L2_YANG           7000
 #define STONE_L2_NAME           "Metin of the Forest"
 #define STONE_L2_SPAWN_CHANCE   30
 #define STONE_L2_SCALE          1.1
@@ -59,9 +62,9 @@
 // ============================================================
 //                   LEVEL 3 - Metin of the Mountain
 // ============================================================
-#define STONE_L3_HP             5500
-#define STONE_L3_XP             400
-#define STONE_L3_YANG           3500
+#define STONE_L3_HP             15000
+#define STONE_L3_XP             15000
+#define STONE_L3_YANG           15000
 #define STONE_L3_NAME           "Metin of the Mountain"
 #define STONE_L3_SPAWN_CHANCE   18
 #define STONE_L3_SCALE          1.3
@@ -72,9 +75,9 @@
 // ============================================================
 //                   LEVEL 4 - Metin of the Desert
 // ============================================================
-#define STONE_L4_HP             9500
-#define STONE_L4_XP             500
-#define STONE_L4_YANG           6000
+#define STONE_L4_HP             30000
+#define STONE_L4_XP             20000
+#define STONE_L4_YANG           18000
 #define STONE_L4_NAME           "Metin of the Desert"
 #define STONE_L4_SPAWN_CHANCE   9
 #define STONE_L4_SCALE          1.5
@@ -85,9 +88,9 @@
 // ============================================================
 //                   LEVEL 5 - Metin of the Heaven
 // ============================================================
-#define STONE_L5_HP             16000
-#define STONE_L5_XP             1000
-#define STONE_L5_YANG           10000
+#define STONE_L5_HP             45000
+#define STONE_L5_XP             40000
+#define STONE_L5_YANG           40000
 #define STONE_L5_NAME           "Metin of the Heaven"
 #define STONE_L5_SPAWN_CHANCE   3
 #define STONE_L5_SCALE          1.7
@@ -98,9 +101,9 @@
 // ============================================================
 //                   BOSS METIN
 // ============================================================
-#define STONE_BOSS_HP           50000
-#define STONE_BOSS_XP           5000
-#define STONE_BOSS_YANG         25000
+#define STONE_BOSS_HP           100000
+#define STONE_BOSS_XP           70000
+#define STONE_BOSS_YANG         50000
 #define STONE_BOSS_NAME         "Boss Metin"
 #define STONE_BOSS_SPAWN_CHANCE 1
 #define STONE_BOSS_SCALE        2.3
@@ -132,13 +135,18 @@ new Float:g_LastHudTime[33]
 new const Float:g_StoneMins[3] = STONE_MINS
 new const Float:g_StoneMaxs[3] = STONE_MAXS
 
+// Model unic pentru toate pietrele
+#define STONE_MODEL             "models/metin2_stone.mdl"
 
-#define STONE_L1_SPRITE         "sprites/blueflare1.spr"
-#define STONE_L2_SPRITE         "sprites/redflare2.spr"
-#define STONE_L3_SPRITE         "sprites/flame.spr"
-#define STONE_L4_SPRITE         "sprites/explode1.spr"
-#define STONE_L5_SPRITE         "sprites/laserbeam.spr"
-#define STONE_BOSS_SPRITE       "sprites/xbeam1.spr"
+// Sprite-uri folosite doar pentru efecte vizuale (TE_*)
+new g_SprLightning
+new g_SprShockwave
+new g_SprFlame
+new g_SprExplode
+new g_SprLaser
+new g_SprXbeam
+new g_SprGlow
+new g_SprSmoke
 
 // ============================================================
 //                         PLUGIN
@@ -146,7 +154,7 @@ new const Float:g_StoneMaxs[3] = STONE_MAXS
 
 public plugin_init()
 {
-	register_plugin("Metin2 Stones System", "1.1", "Grok")
+	register_plugin("Metin2 Stones System", "1.2", "Grok")
 	
 	register_event("HLTV", "event_new_round", "a", "1=0", "2=0")
 	
@@ -155,18 +163,23 @@ public plugin_init()
 	
 	set_task(10.0, "task_TrySpawnStone", TASK_SPAWN, _, _, "b")
 	
-	server_print("[Metin2 Stones] Plugin incarcat | Max pietre: %d | Interval: %.0fs", MAX_STONES, SPAWN_INTERVAL)
+	server_print("[Metin2 Stones] Plugin incarcat | Max pietre: %d | Interval: %.0fs | Model: %s", MAX_STONES, SPAWN_INTERVAL, STONE_MODEL)
 }
 
 public plugin_precache()
 {
-	// Precache toate sprite-urile folosite
-	precache_model(STONE_L1_SPRITE)
-	precache_model(STONE_L2_SPRITE)
-	precache_model(STONE_L3_SPRITE)
-	precache_model(STONE_L4_SPRITE)
-	precache_model(STONE_L5_SPRITE)
-	precache_model(STONE_BOSS_SPRITE)
+	// Model-ul principal
+	precache_model(STONE_MODEL)
+	
+	// Sprite-uri pentru efecte (TE_ messages)
+	g_SprLightning  = precache_model("sprites/lgtning.spr")
+	g_SprShockwave  = precache_model("sprites/shockwave.spr")
+	g_SprFlame      = precache_model("sprites/flame.spr")
+	g_SprExplode    = precache_model("sprites/explode1.spr")
+	g_SprLaser      = precache_model("sprites/laserbeam.spr")
+	g_SprXbeam      = precache_model("sprites/xbeam1.spr")
+	g_SprGlow       = precache_model("sprites/blueflare1.spr")
+	g_SprSmoke      = precache_model("sprites/smoke.spr")
 }
 
 public plugin_cfg()
@@ -236,7 +249,7 @@ stock get_random_stone_level()
 stock bool:get_valid_spawn_origin(Float:origin[3])
 {
 	new Float:start[3], Float:end[3]
-	new tries = 30
+	new tries = 50
 	
 	while (tries--)
 	{
@@ -256,10 +269,45 @@ stock bool:get_valid_spawn_origin(Float:origin[3])
 			continue
 		
 		get_tr2(0, TR_vecEndPos, origin)
-		origin[2] += 8.0
 		
+		// Plutește deasupra solului (nu mai e în pământ)
+		origin[2] += STONE_FLOAT_HEIGHT
+		
+		// Verifică că punctul e în aer liber
 		new contents = engfunc(EngFunc_PointContents, origin)
 		if (contents != CONTENTS_EMPTY && contents != CONTENTS_WATER)
+			continue
+		
+		// Verifică și un pic mai sus / mai jos să nu fie în perete
+		new Float:check[3]
+		check[0] = origin[0]
+		check[1] = origin[1]
+		check[2] = origin[2] + 30.0
+		contents = engfunc(EngFunc_PointContents, check)
+		if (contents != CONTENTS_EMPTY && contents != CONTENTS_WATER)
+			continue
+		
+		check[2] = origin[2] - 15.0
+		contents = engfunc(EngFunc_PointContents, check)
+		if (contents != CONTENTS_EMPTY && contents != CONTENTS_WATER)
+			continue
+		
+		// Verificare laterală simplă (să nu fie în perete)
+		static const Float:offsets[] = { 25.0, -25.0 }
+		new bool:bad = false
+		for (new i = 0; i < 2 && !bad; i++)
+		{
+			for (new j = 0; j < 2 && !bad; j++)
+			{
+				check[0] = origin[0] + offsets[i]
+				check[1] = origin[1] + offsets[j]
+				check[2] = origin[2]
+				contents = engfunc(EngFunc_PointContents, check)
+				if (contents != CONTENTS_EMPTY && contents != CONTENTS_WATER)
+					bad = true
+			}
+		}
+		if (bad)
 			continue
 		
 		if (is_too_close_to_players(origin, MIN_DISTANCE_PLAYERS))
@@ -336,10 +384,8 @@ stock create_stone(level, const Float:origin[3])
 	
 	set_pev(ent, pev_classname, STONE_CLASSNAME)
 	
-	// Sprite diferit pe level
-	new sprite[64]
-	get_stone_sprite(level, sprite, charsmax(sprite))
-	engfunc(EngFunc_SetModel, ent, sprite)
+	// Model unic pentru toate level-urile
+	engfunc(EngFunc_SetModel, ent, STONE_MODEL)
 	
 	set_pev(ent, pev_solid, SOLID_BBOX)
 	set_pev(ent, pev_movetype, MOVETYPE_NONE)
@@ -349,10 +395,12 @@ stock create_stone(level, const Float:origin[3])
 	engfunc(EngFunc_SetSize, ent, g_StoneMins, g_StoneMaxs)
 	engfunc(EngFunc_SetOrigin, ent, origin)
 	
-	// ========== GLOW + CULOARE ==========
-	set_pev(ent, pev_rendermode, kRenderTransAdd)
-	set_pev(ent, pev_renderfx, kRenderFxPulseSlow)
-	set_pev(ent, pev_renderamt, 220.0)
+	// ========== MODEL SOLID + GLOW SHELL (culoare pe level) ==========
+	// kRenderNormal = modelul se vede complet (nu transparent)
+	// kRenderFxGlowShell = lucire/glow colorat in jurul modelului
+	set_pev(ent, pev_rendermode, kRenderNormal)
+	set_pev(ent, pev_renderfx, kRenderFxGlowShell)
+	set_pev(ent, pev_renderamt, 25.0)          // intensitate shell (15-40 e ok)
 	set_pev(ent, pev_scale, get_stone_scale(level))
 	
 	new r, g, b
@@ -430,6 +478,7 @@ public fw_Stone_TakeDamage(victim, inflictor, attacker, Float:damage, damagebits
 	
 	return HAM_SUPERCEDE
 }
+
 public fw_Stone_Think(ent)
 {
 	if (!pev_valid(ent))
@@ -442,7 +491,6 @@ public fw_Stone_Think(ent)
 		return
 	
 	// Anti-stuck: împinge afară orice player prins în bbox-ul pietrei
-	// (previne bug-ul de crash: crouch + cuțit intrat în piatră)
 	new Float:stone_origin[3], Float:player_origin[3]
 	pev(ent, pev_origin, stone_origin)
 	
@@ -471,7 +519,115 @@ public fw_Stone_Think(ent)
 		}
 	}
 	
-	set_pev(ent, pev_nextthink, get_gametime() + 0.3)
+	// Fără efecte periodice (fum/flare) – rămâne doar model solid + GlowShell
+	set_pev(ent, pev_nextthink, get_gametime() + 0.35)
+}
+
+// ============================================================
+//               EFECTE VIZUALE (pe level)
+// ============================================================
+
+stock create_stone_effect(slot, const Float:origin[3])
+{
+	new level = g_Stones[slot][STONE_LEVEL]
+	new r, g, b
+	get_stone_color(level, r, g, b)
+	
+	// Fum / aura soft care urcă (efect tip Metin – pe toate level-urile)
+	message_begin(MSG_BROADCAST, SVC_TEMPENTITY)
+	write_byte(TE_SMOKE)
+	engfunc(EngFunc_WriteCoord, origin[0] + random_float(-12.0, 12.0))
+	engfunc(EngFunc_WriteCoord, origin[1] + random_float(-12.0, 12.0))
+	engfunc(EngFunc_WriteCoord, origin[2] + random_float(15.0, 45.0))
+	write_short(g_SprSmoke)
+	write_byte(8 + level)		// scale
+	write_byte(12)				// framerate
+	message_end()
+	
+	// Flare colorat care "pulsează" deasupra pietrei (glow soft)
+	message_begin(MSG_BROADCAST, SVC_TEMPENTITY)
+	write_byte(TE_SPRITE)
+	engfunc(EngFunc_WriteCoord, origin[0])
+	engfunc(EngFunc_WriteCoord, origin[1])
+	engfunc(EngFunc_WriteCoord, origin[2] + 35.0 + float(level) * 3.0)
+	write_short(g_SprGlow)
+	write_byte(6 + level * 2)	// scale (mai mare pe level mai mare)
+	write_byte(160 + level * 10)// brightness
+	message_end()
+	
+	// Efecte extra pe level-uri mai mari
+	switch (level)
+	{
+		case 3, 4: // Mountain / Desert – scântei / flăcări
+		{
+			message_begin(MSG_BROADCAST, SVC_TEMPENTITY)
+			write_byte(TE_SPRITE)
+			engfunc(EngFunc_WriteCoord, origin[0] + random_float(-18.0, 18.0))
+			engfunc(EngFunc_WriteCoord, origin[1] + random_float(-18.0, 18.0))
+			engfunc(EngFunc_WriteCoord, origin[2] + random_float(20.0, 55.0))
+			write_short(g_SprFlame)
+			write_byte(5)
+			write_byte(180)
+			message_end()
+		}
+		case 5: // Heaven – laser soft vertical
+		{
+			message_begin(MSG_BROADCAST, SVC_TEMPENTITY)
+			write_byte(TE_BEAMPOINTS)
+			engfunc(EngFunc_WriteCoord, origin[0])
+			engfunc(EngFunc_WriteCoord, origin[1])
+			engfunc(EngFunc_WriteCoord, origin[2] + 10.0)
+			engfunc(EngFunc_WriteCoord, origin[0] + random_float(-20.0, 20.0))
+			engfunc(EngFunc_WriteCoord, origin[1] + random_float(-20.0, 20.0))
+			engfunc(EngFunc_WriteCoord, origin[2] + 160.0)
+			write_short(g_SprLaser)
+			write_byte(0)
+			write_byte(0)
+			write_byte(4)
+			write_byte(6)
+			write_byte(5)
+			write_byte(r)
+			write_byte(g)
+			write_byte(b)
+			write_byte(180)
+			write_byte(0)
+			message_end()
+		}
+		case 6: // Boss – fulger + flare puternic
+		{
+			message_begin(MSG_BROADCAST, SVC_TEMPENTITY)
+			write_byte(TE_BEAMPOINTS)
+			engfunc(EngFunc_WriteCoord, origin[0])
+			engfunc(EngFunc_WriteCoord, origin[1])
+			engfunc(EngFunc_WriteCoord, origin[2] + 5.0)
+			engfunc(EngFunc_WriteCoord, origin[0] + random_float(-25.0, 25.0))
+			engfunc(EngFunc_WriteCoord, origin[1] + random_float(-25.0, 25.0))
+			engfunc(EngFunc_WriteCoord, origin[2] + 200.0)
+			write_short(g_SprLightning)
+			write_byte(0)
+			write_byte(0)
+			write_byte(5)
+			write_byte(10)
+			write_byte(25)
+			write_byte(r)
+			write_byte(g)
+			write_byte(b)
+			write_byte(220)
+			write_byte(0)
+			message_end()
+			
+			// Extra flare mare
+			message_begin(MSG_BROADCAST, SVC_TEMPENTITY)
+			write_byte(TE_SPRITE)
+			engfunc(EngFunc_WriteCoord, origin[0])
+			engfunc(EngFunc_WriteCoord, origin[1])
+			engfunc(EngFunc_WriteCoord, origin[2] + 50.0)
+			write_short(g_SprGlow)
+			write_byte(18)
+			write_byte(230)
+			message_end()
+		}
+	}
 }
 
 stock destroy_stone(slot, killer)
@@ -491,21 +647,10 @@ stock destroy_stone(slot, killer)
 		new Float:origin[3]
 		pev(ent, pev_origin, origin)
 		
-		// Efect de explozie
-		message_begin(MSG_BROADCAST, SVC_TEMPENTITY)
-		write_byte(TE_EXPLOSION)
-		engfunc(EngFunc_WriteCoord, origin[0])
-		engfunc(EngFunc_WriteCoord, origin[1])
-		engfunc(EngFunc_WriteCoord, origin[2] + 25.0)
-		write_short(0)
-		write_byte(15)
-		write_byte(12)
-		write_byte(0)
-		message_end()
+		// Efect de distrugere spectaculos (diferit pe level)
+		create_destroy_effect(level, origin)
 		
-		// Remove amânat (nu sincron din hook-ul de damage), ca să nu crape
-		// serverul dacă entitatea e ștearsă în timp ce e coliziune activă
-		// pe ea (ex: player blocat înăuntru cu crouch)
+		// Remove amânat (nu sincron din hook-ul de damage)
 		new data[1]
 		data[0] = ent
 		set_task(0.05, "task_DeferredRemove", 0, data, 1)
@@ -531,6 +676,139 @@ stock destroy_stone(slot, killer)
 	
 	if (g_StoneCount < 0)
 		g_StoneCount = 0
+}
+
+stock create_destroy_effect(level, const Float:origin[3])
+{
+	new r, g, b
+	get_stone_color(level, r, g, b)
+	
+	// Explozie de bază
+	message_begin(MSG_BROADCAST, SVC_TEMPENTITY)
+	write_byte(TE_EXPLOSION)
+	engfunc(EngFunc_WriteCoord, origin[0])
+	engfunc(EngFunc_WriteCoord, origin[1])
+	engfunc(EngFunc_WriteCoord, origin[2] + 25.0)
+	write_short(g_SprExplode)
+	write_byte(18)		// scale
+	write_byte(15)		// framerate
+	write_byte(0)		// flags
+	message_end()
+	
+	// Shockwave mare
+	message_begin(MSG_BROADCAST, SVC_TEMPENTITY)
+	write_byte(TE_BEAMCYLINDER)
+	engfunc(EngFunc_WriteCoord, origin[0])
+	engfunc(EngFunc_WriteCoord, origin[1])
+	engfunc(EngFunc_WriteCoord, origin[2] + 5.0)
+	engfunc(EngFunc_WriteCoord, origin[0])
+	engfunc(EngFunc_WriteCoord, origin[1])
+	engfunc(EngFunc_WriteCoord, origin[2] + 350.0)
+	write_short(g_SprShockwave)
+	write_byte(0)
+	write_byte(0)
+	write_byte(12)
+	write_byte(60)
+	write_byte(0)
+	write_byte(r)
+	write_byte(g)
+	write_byte(b)
+	write_byte(220)
+	write_byte(0)
+	message_end()
+	
+	// Beam explosion / lightning burst (mai spectaculos pe level-uri mari)
+	if (level >= 4)
+	{
+		// Multiple lightning beams
+		for (new i = 0; i < 6; i++)
+		{
+			message_begin(MSG_BROADCAST, SVC_TEMPENTITY)
+			write_byte(TE_BEAMPOINTS)
+			engfunc(EngFunc_WriteCoord, origin[0])
+			engfunc(EngFunc_WriteCoord, origin[1])
+			engfunc(EngFunc_WriteCoord, origin[2] + 20.0)
+			engfunc(EngFunc_WriteCoord, origin[0] + random_float(-180.0, 180.0))
+			engfunc(EngFunc_WriteCoord, origin[1] + random_float(-180.0, 180.0))
+			engfunc(EngFunc_WriteCoord, origin[2] + random_float(80.0, 250.0))
+			write_short(g_SprLightning)
+			write_byte(0)
+			write_byte(0)
+			write_byte(8)
+			write_byte(18)
+			write_byte(50)
+			write_byte(r)
+			write_byte(g)
+			write_byte(b)
+			write_byte(255)
+			write_byte(0)
+			message_end()
+		}
+	}
+	
+	// Extra pentru Boss: torus + xbeam vertical masiv
+	if (level == 6)
+	{
+		message_begin(MSG_BROADCAST, SVC_TEMPENTITY)
+		write_byte(TE_BEAMTORUS)
+		engfunc(EngFunc_WriteCoord, origin[0])
+		engfunc(EngFunc_WriteCoord, origin[1])
+		engfunc(EngFunc_WriteCoord, origin[2] + 10.0)
+		engfunc(EngFunc_WriteCoord, origin[0])
+		engfunc(EngFunc_WriteCoord, origin[1])
+		engfunc(EngFunc_WriteCoord, origin[2] + 400.0)
+		write_short(g_SprXbeam)
+		write_byte(0)
+		write_byte(0)
+		write_byte(15)
+		write_byte(40)
+		write_byte(0)
+		write_byte(r)
+		write_byte(g)
+		write_byte(b)
+		write_byte(255)
+		write_byte(0)
+		message_end()
+		
+		// Vertical mega beam
+		message_begin(MSG_BROADCAST, SVC_TEMPENTITY)
+		write_byte(TE_BEAMPOINTS)
+		engfunc(EngFunc_WriteCoord, origin[0])
+		engfunc(EngFunc_WriteCoord, origin[1])
+		engfunc(EngFunc_WriteCoord, origin[2])
+		engfunc(EngFunc_WriteCoord, origin[0])
+		engfunc(EngFunc_WriteCoord, origin[1])
+		engfunc(EngFunc_WriteCoord, origin[2] + 500.0)
+		write_short(g_SprXbeam)
+		write_byte(0)
+		write_byte(0)
+		write_byte(12)
+		write_byte(35)
+		write_byte(20)
+		write_byte(r)
+		write_byte(g)
+		write_byte(b)
+		write_byte(255)
+		write_byte(0)
+		message_end()
+	}
+	
+	// Sprite trail residual (particule care zboară)
+	message_begin(MSG_BROADCAST, SVC_TEMPENTITY)
+	write_byte(TE_SPRITETRAIL)
+	engfunc(EngFunc_WriteCoord, origin[0])
+	engfunc(EngFunc_WriteCoord, origin[1])
+	engfunc(EngFunc_WriteCoord, origin[2] + 30.0)
+	engfunc(EngFunc_WriteCoord, origin[0])
+	engfunc(EngFunc_WriteCoord, origin[1])
+	engfunc(EngFunc_WriteCoord, origin[2] + 120.0)
+	write_short(g_SprGlow)
+	write_byte(25)		// count
+	write_byte(3)		// life (0.1s units)
+	write_byte(4)		// scale
+	write_byte(50)		// velocity along vector
+	write_byte(20)		// randomness of velocity
+	message_end()
 }
 
 stock give_stone_rewards(id, level)
@@ -629,20 +907,6 @@ stock get_stone_name(level, output[], len)
 		case 5: copy(output, len, STONE_L5_NAME)
 		case 6: copy(output, len, STONE_BOSS_NAME)
 		default: copy(output, len, "Metin Necunoscut")
-	}
-}
-
-stock get_stone_sprite(level, output[], len)
-{
-	switch (level)
-	{
-		case 1: copy(output, len, STONE_L1_SPRITE)
-		case 2: copy(output, len, STONE_L2_SPRITE)
-		case 3: copy(output, len, STONE_L3_SPRITE)
-		case 4: copy(output, len, STONE_L4_SPRITE)
-		case 5: copy(output, len, STONE_L5_SPRITE)
-		case 6: copy(output, len, STONE_BOSS_SPRITE)
-		default: copy(output, len, "sprites/glow.spr")
 	}
 }
 
