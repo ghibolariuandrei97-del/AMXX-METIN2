@@ -19,6 +19,16 @@
 #include <hamsandwich>
 #include <fun>
 
+// AMX Mod X 1.8.2 / 1.8.3+ Inline Multilingual Formatting Support
+#if !defined fmt
+stock fmt(const szFormat[], any:...)
+{
+    static szBuffer[512];
+    vformat(szBuffer, charsmax(szBuffer), szFormat, 2);
+    return szBuffer;
+}
+#endif
+
 #define PLUGIN  "Metin2Core"
 #define VERSION "1.6"
 #define AUTHOR  "Craxor"
@@ -271,6 +281,8 @@ public plugin_init()
 {
 	register_plugin(PLUGIN, VERSION, AUTHOR);
 	
+	register_dictionary("metin2Core.txt");
+
 	register_clcmd("say /menu",     "cmd_menu");
 	register_clcmd("say /metin2",   "cmd_status_motd");
 	register_clcmd("say /stats",    "cmd_stats");
@@ -900,7 +912,7 @@ public OnClientUserInfoChanged(id)
 	if (!equal(oldname, newname) && oldname[0])
 	{
 		set_user_info(id, "name", oldname);
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Schimbarea numelui este blocata pe acest server!");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_SCHIMBAREA_NUMELUI_ESTE");
 		debug_log_user(id, "OnClientUserInfoChanged: Nume a fost blocat! din %s in %s",oldname, newname);
 		return FMRES_HANDLED;
 	}
@@ -928,11 +940,11 @@ public Task_WelcomeMsg(id)
 	debug_log_user(id, " public Task_WelcomeMEssage a fost apelat!" );
 	if (g_Player[id][g_Race] == RACE_NONE)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Bun venit! Alege-ti rasa cu ^3/menu^1.");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_BUN_VENIT_ALEGE");
 	}
 	else
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Date incarcate. Level: ^3%d^1 | Yang: ^3%d", g_Player[id][g_Level], g_Player[id][g_Yang]);
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_DATE_INCARCATE_LEVEL", g_Player[id][g_Level], g_Player[id][g_Yang]);
 	}
 
 }
@@ -1108,7 +1120,7 @@ stock add_xp(id, amount)
 		set_user_rendering(id, kRenderFxGlowShell, 255, 215, 0, kRenderNormal, 40);
 		emit_sound(id, CHAN_AUTO, "buttons/bell1.wav", 1.0, ATTN_NORM, 0, PITCH_HIGH);
 		
-		client_print_color(0, print_team_default, "^4[Metin2]^1 %n a ajuns la ^3Level %d^1!", id, g_Player[id][g_Level]);
+		client_print_color(0, print_team_default, "%L", LANG_PLAYER, "METIN2_METIN2_%N_AJUNS_LA", id, g_Player[id][g_Level]);
 		
 		new ret;
 		ExecuteForward(g_fwd_LevelUp, ret, id, g_Player[id][g_Level]);
@@ -1158,7 +1170,7 @@ public OnDeath()
 	g_Player[killer][g_Yang] += yang;
 	save_player(killer);
 	
-	client_print_color(killer, print_team_default, "^4[Metin2]^1 +%d XP | +%d Yang%s", xp, yang, headshot ? " ^3(Headshot)" : "");
+	client_print_color(killer, print_team_default, "%L", killer, "METIN2_METIN2_XP_YANG", xp, yang, headshot ? " ^3(Headshot)" : "");
 	debug_log_user(victim, "OnDeah() Victim Id");
 	debug_log_user(killer, "OnDeah() Killer Id");
 	
@@ -1258,7 +1270,7 @@ public OnTakeDamage(victim, inflictor, attacker, Float:damage, damagebits)
 	{
 		damage *= 3.0;
 		g_AmbushActive[attacker] = false;
-		client_print_color(attacker, print_team_default, "^4[Metin2]^1 ^3AMBUSH CRIT!");
+		client_print_color(attacker, print_team_default, "%L", attacker, "METIN2_METIN2_AMBUSH_CRIT");
 	}
 	
 	// Armor Pierce - reduce defense (folosește total DEX + armor)
@@ -1321,7 +1333,7 @@ public Task_HUD()
 			{
 				// Nu urmărește pe nimeni valid → mesaj simplu
 				set_hudmessage(255, 180, 0, -1.0, 0.90, 0, 0.0, 1.1, 0.0, 0.0, -1);
-				ShowSyncHudMsg(id, g_HudSync, "[Metin2] Esti mort. Alege un jucator pentru a vedea statusul lui.");
+				ShowSyncHudMsg(id, g_HudSync, "%L", id, "METIN2_METIN2_ESTI_MORT_ALEGE");
 				continue;
 			}
 		}
@@ -1332,12 +1344,12 @@ public Task_HUD()
 			if (target == id)
 			{
 				set_hudmessage(255, 200, 0, -1.0, 0.90, 0, 0.0, 1.1, 0.0, 0.0, -1);
-				ShowSyncHudMsg(id, g_HudSync, "[Metin2] Scrie /menu sau /metin2 ca sa-ti alegi caracterul si sa incepi jocul!");
+				ShowSyncHudMsg(id, g_HudSync, "%L", id, "METIN2_METIN2_SCRIE_MENU_SAU");
 			}
 			else
 			{
 				set_hudmessage(255, 180, 0, -1.0, 0.90, 0, 0.0, 1.1, 0.0, 0.0, -1);
-				ShowSyncHudMsg(id, g_HudSync, "[Metin2] Jucatorul urmarit nu are rasa aleasa.");
+				ShowSyncHudMsg(id, g_HudSync, "%L", id, "METIN2_METIN2_JUCATORUL_URMARIT_NU");
 			}
 			continue;
 		}
@@ -1363,16 +1375,7 @@ public Task_HUD()
 		
 		new hp = is_user_alive(target) ? get_user_health(target) : 0;
 		
-		ShowSyncHudMsg(id, g_HudSync, "%s[Metin2] %s | Lvl %d | XP %.1f%% | HP %d | Yang %d | MP %d/%d | SP %d | SkP %d",
-			prefix,
-			g_RaceName[g_Player[target][g_Race]],
-			g_Player[target][g_Level],
-			pct,
-			hp,
-			g_Player[target][g_Yang],
-			g_Player[target][g_MP], g_Player[target][g_MaxMP],
-			g_Player[target][g_StatPoints],
-			g_Player[target][g_SkillPoints]);
+		ShowSyncHudMsg(id, g_HudSync, "%L", id, "METIN2_METIN2_LVL_XP_HP", prefix, g_RaceName[g_Player[target][g_Race]], g_Player[target][g_Level], pct, hp, g_Player[target][g_Yang], g_Player[target][g_MP], g_Player[target][g_MaxMP], g_Player[target][g_StatPoints], g_Player[target][g_SkillPoints]);
 	}
 }
 
@@ -1403,7 +1406,7 @@ stock bool:can_use_skill(id, skill_slot)
 	
 	if (now < g_SkillCooldown[id][skill_slot])
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Skill in cooldown!");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_SKILL_IN_COOLDOWN");
 		return false;
 	}
 	
@@ -1413,14 +1416,14 @@ stock bool:can_use_skill(id, skill_slot)
 	
 	if (g_Player[id][g_SkillLevel][skill_idx] <= 0)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Skill-ul nu este invatat!");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_SKILL_UL_NU");
 		return false;
 	}
 	
 	new cost = g_SkillManaCost[skill_slot] + (g_Player[id][g_SkillLevel][skill_idx] / 4);
 	if (g_Player[id][g_MP] < cost)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Mana insuficienta! Ai nevoie de %d MP.", cost);
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_MANA_INSUFICIENTA_AI", cost);
 		return false;
 	}
 	
@@ -1438,7 +1441,7 @@ stock execute_skill(id, slot)
 	new skill_idx = (race - 1) * 10 + (path - 1) * 5 + slot;
 	new lvl = g_Player[id][g_SkillLevel][skill_idx];
 	
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Activezi: ^3%s ^1(Nivel %d)", g_SkillName[skill_idx], lvl);
+	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_ACTIVEZI_NIVEL", g_SkillName[skill_idx], lvl);
 	
 	switch (race)
 	{
@@ -1524,7 +1527,7 @@ stock skill_warrior_corporal(id, slot, lvl)
 			set_task(dur, "RemoveAura", id);
 			apply_skill_cooldown(id, 0, 20.0);
 			new Float:bonus = 28.0 + float(lvl) * 2.4 + float(get_total_str(id)) * 0.6 + float(g_Player[id][g_Level]) * 0.5;
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Aura Sabiei: +damage (%.1f sec). Bonus: +%.0f dmg!", dur, bonus);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AURA_SABIEI_DAMAGE", dur, bonus);
 		}
 		case 1: // Corp Rezistent - real damage reduction (HP dominant)
 		{
@@ -1537,7 +1540,7 @@ stock skill_warrior_corporal(id, slot, lvl)
 			set_user_rendering(id, kRenderFxGlowShell, 30, 100, 255, kRenderNormal, 35);
 			set_task(dur, "RemoveResist", id);
 			apply_skill_cooldown(id, 1, 26.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Corp Rezistent: reducere damage cu ^3%.0f%% ^1timp de %.1f sec!", g_ResistAmount[id] * 100.0, dur);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_CORP_REZISTENT_REDUCERE", g_ResistAmount[id] * 100.0, dur);
 		}
 		case 2: // Izbitura - stun
 		{
@@ -1549,12 +1552,12 @@ stock skill_warrior_corporal(id, slot, lvl)
 				set_pev(target, pev_flags, pev(target, pev_flags) | FL_FROZEN);
 				set_task(stun, "Unfreeze", target);
 				apply_skill_cooldown(id, 2, 16.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Izbitura: inamic inghetat ^3%.1f secunde^1!", stun);
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_IZBITURA_INAMIC_INGHETAT", stun);
 			}
 			else
 			{
 				apply_skill_cooldown(id, 2, 16.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida in fata ta.");
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_NICIO_TINTA_VALIDA");
 			}
 		}
 		case 3: // Dash
@@ -1571,7 +1574,7 @@ stock skill_warrior_corporal(id, slot, lvl)
 			set_pev(id, pev_velocity, vec);
 	
 			apply_skill_cooldown(id, 3, 12.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Atac Sabie: dash inainte!");
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_ATAC_SABIE_DASH");
 		}
 		case 4: // Vartej AoE
 		{
@@ -1597,7 +1600,7 @@ stock skill_warrior_corporal(id, slot, lvl)
 				}
 			}
 			apply_skill_cooldown(id, 4, 24.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Vartej Sabie: AoE %.0f dmg in raza %.0f | Inamici loviti: %d", dmg, radius, hit);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_VARTEJ_SABIE_AOE", dmg, radius, hit);
 		}
 	}
 }
@@ -1630,7 +1633,7 @@ stock skill_sura_arme(id, slot, lvl)
 			set_user_rendering(id, kRenderFxGlowShell, 180, 50, 255, kRenderNormal, 40);
 			set_task(dur, "RemoveAura", id);
 			apply_skill_cooldown(id, 0, 18.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Tais Vrajit: +damage magic (%.1f sec). Putere bazata pe INT!", dur);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_TAIS_VRAJIT_DAMAGE", dur);
 		}
 		case 1: // Reflect
 		{
@@ -1640,7 +1643,7 @@ stock skill_sura_arme(id, slot, lvl)
 			set_user_rendering(id, kRenderFxGlowShell, 255, 0, 100, kRenderNormal, 35);
 			set_task(dur, "RemoveReflect", id);
 			apply_skill_cooldown(id, 1, 28.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Armura Vrajita: reflecti ^335%% ^1din damage-ul primit timp de %.1f sec!", dur);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_ARMURA_VRAJITA_REFLECTI", dur);
 		}
 		case 2: // Armor Pierce - real pierce
 		{
@@ -1652,7 +1655,7 @@ stock skill_sura_arme(id, slot, lvl)
 			if (dur > 12.0) dur = 12.0;
 			set_task(dur, "RemovePierce", id);
 			apply_skill_cooldown(id, 2, 14.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Lovitura Degetului (Armor Pierce): ignori ^3%.0f%% ^1din apararea inamicului timp de %.1f sec!", g_PierceAmount[id] * 100.0, dur);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_LOVITURA_DEGETULUI_ARMOR", g_PierceAmount[id] * 100.0, dur);
 		}
 		case 3: // Slow
 		{
@@ -1664,12 +1667,12 @@ stock skill_sura_arme(id, slot, lvl)
 				set_user_maxspeed(target, 110.0);
 				set_task(slow_dur, "RestoreSpeed", target);
 				apply_skill_cooldown(id, 3, 16.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Atacul Fulgerului: tinta incetinita la 110 speed timp de ^3%.1f sec^1!", slow_dur);
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_ATACUL_FULGERULUI_TINTA", slow_dur);
 			}
 			else
 			{
 				apply_skill_cooldown(id, 3, 16.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_NICIO_TINTA_VALIDA_2");
 			}
 		}
 		case 4: // Pietrificare - real freeze + slow after
@@ -1686,12 +1689,12 @@ stock skill_sura_arme(id, slot, lvl)
 				set_task(stun + 0.1, "ApplyResidualSlow", target);
 				
 				apply_skill_cooldown(id, 4, 34.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Pietrificare: inamicul este ^3pietrificat %.1f sec^1 + slow ulterior!", stun);
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_PIETRIFICARE_INAMICUL_ESTE", stun);
 			}
 			else
 			{
 				apply_skill_cooldown(id, 4, 34.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida pentru Pietrificare.");
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_NICIO_TINTA_VALIDA_3");
 			}
 		}
 	}
@@ -1726,7 +1729,7 @@ public cmd_reset(id)
 	
 	if (g_Player[id][g_Race] == RACE_NONE)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Nu ai inca o rasa aleasa!");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_NU_AI_INCA");
 		return PLUGIN_HANDLED;
 	}
 	
@@ -1807,9 +1810,8 @@ public cmd_reset(id)
 	
 	save_player(id);
 	
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Caracter resetat! Level: ^3%d^1 | Stat Points: ^3%d^1 | Skill Points: ^3%d", 
-		level, g_Player[id][g_StatPoints], g_Player[id][g_SkillPoints]);
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Itemele si Yang-ul au fost pastrate. Alege noua rasa cu ^3/menu^1.");
+	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_CARACTER_RESETAT_LEVEL", level, g_Player[id][g_StatPoints], g_Player[id][g_SkillPoints]);
+	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_ITEMELE_SI_YANG");
 
 	debug_log_user(id, "cmd reset()");
 	
@@ -1831,7 +1833,7 @@ stock skill_ninja_lame(id, slot, lvl)
 			set_user_rendering(id, kRenderFxNone, 0, 0, 0, kRenderTransAlpha, 8);
 			set_task(dur, "RemoveInvis", id);
 			apply_skill_cooldown(id, 0, 24.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Camuflaj: esti aproape invizibil timp de ^3%.1f secunde^1!", dur);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_CAMUFLAJ_ESTI_APROAPE", dur);
 		}
 		case 1: // Speed
 		{
@@ -1841,13 +1843,13 @@ stock skill_ninja_lame(id, slot, lvl)
 			if (dur > 12.0) dur = 12.0;
 			set_task(dur, "RestoreSpeed", id);
 			apply_skill_cooldown(id, 1, 18.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Atacul Fulgerator: viteza crescuta la ^3%.0f ^1timp de %.1f sec!", spd, dur);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_ATACUL_FULGERATOR_VITEZA", spd, dur);
 		}
 		case 2: // Ambush
 		{
 			g_AmbushActive[id] = true;
 			apply_skill_cooldown(id, 2, 15.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Ambush pregatit! Urmatorul atac va fi ^3CRITIC x3^1.");
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AMBUSH_PREGATIT_URMATORUL");
 		}
 		case 3: // Poison
 		{
@@ -1859,12 +1861,12 @@ stock skill_ninja_lame(id, slot, lvl)
 				if (ticks > 12) ticks = 12;
 				set_task(1.0, "PoisonTick", taskid, _, _, "a", ticks);
 				apply_skill_cooldown(id, 3, 17.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Otrava: DoT pe tinta (%d tick-uri de poison)!", ticks);
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_OTRAVA_DOT_PE", ticks);
 			}
 			else
 			{
 				apply_skill_cooldown(id, 3, 17.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_NICIO_TINTA_VALIDA_2");
 			}
 		}
 		case 4: // Ploaie de sageti (AoE mic)
@@ -1890,7 +1892,7 @@ stock skill_ninja_lame(id, slot, lvl)
 				}
 			}
 			apply_skill_cooldown(id, 4, 26.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Ploaie de Sageti: AoE %.0f dmg | Inamici loviti: %d", dmg, hit);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_PLOAIE_DE_SAGETI", dmg, hit);
 		}
 	}
 }
@@ -1929,7 +1931,7 @@ stock skill_shaman_zmeu(id, slot, lvl)
 			}
 			
 			apply_skill_cooldown(id, 0, 14.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Chemarea Dragonului: ^3%.0f^1 dmg foc pe %d inamici!", dmg, hit);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_CHEMAREA_DRAGONULUI_DMG", dmg, hit);
 		}
 		
 		// 1 - Flacara Dragonului: damage mare single-target
@@ -1941,12 +1943,12 @@ stock skill_shaman_zmeu(id, slot, lvl)
 				new Float:dmg = 55.0 + power * 1.15;
 				ExecuteHamB(Ham_TakeDamage, target, id, id, dmg, DMG_BURN);
 				apply_skill_cooldown(id, 1, 12.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Flacara Dragonului: ^3%.0f^1 dmg foc!", dmg);
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_FLACARA_DRAGONULUI_DMG", dmg);
 			}
 			else
 			{
 				apply_skill_cooldown(id, 1, 12.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_NICIO_TINTA_VALIDA_2");
 			}
 		}
 		
@@ -1962,7 +1964,7 @@ stock skill_shaman_zmeu(id, slot, lvl)
 			set_user_rendering(id, kRenderFxGlowShell, 255, 140, 40, kRenderNormal, 40);
 			set_task(dur, "RemoveResist", id);
 			apply_skill_cooldown(id, 2, 22.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Scut de Solzi: reducere damage ^3%.0f%%^1 timp de %.1f sec!", g_ResistAmount[id]*100.0, dur);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_SCUT_DE_SOLZI", g_ResistAmount[id]*100.0, dur);
 		}
 		
 		// 3 - Zborul Dragonului: boost de viteză
@@ -1982,7 +1984,7 @@ stock skill_shaman_zmeu(id, slot, lvl)
 			if (dur > 12.0) dur = 12.0;
 			set_task(dur, "RestoreSpeed", id);
 			apply_skill_cooldown(id, 3, 18.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Zborul Dragonului: viteza crescuta timp de ^3%.1f sec^1!", dur);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_ZBORUL_DRAGONULUI_VITEZA", dur);
 		}
 		
 		// 4 - Furia Dragonului: buff puternic de damage + mic AoE la activare
@@ -2012,7 +2014,7 @@ stock skill_shaman_zmeu(id, slot, lvl)
 			}
 			
 			apply_skill_cooldown(id, 4, 30.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Furia Dragonului: +damage + burst foc timp de ^3%.1f sec^1!", dur);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_FURIA_DRAGONULUI_DAMAGE", dur);
 		}
 	}
 }
@@ -2033,12 +2035,12 @@ stock skill_warrior_mental(id, slot, lvl)
 				new Float:dmg = 40.0 + power;
 				ExecuteHamB(Ham_TakeDamage, target, id, id, dmg, DMG_ENERGYBEAM);
 				apply_skill_cooldown(id, 0, 14.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Lovitura Spiritului: ^3%.0f^1 damage magic!", dmg);
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_LOVITURA_SPIRITULUI_DAMAGE", dmg);
 			}
 			else
 			{
 				apply_skill_cooldown(id, 0, 14.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_NICIO_TINTA_VALIDA_2");
 			}
 		}
 		case 1: // Scut Mental - absorb damage (HP + INT)
@@ -2052,7 +2054,7 @@ stock skill_warrior_mental(id, slot, lvl)
 			set_user_rendering(id, kRenderFxGlowShell, 100, 100, 255, kRenderNormal, 35);
 			set_task(dur, "RemoveResist", id);
 			apply_skill_cooldown(id, 1, 22.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Scut Mental: reducere damage ^3%.0f%%^1 timp de %.1f sec!", g_ResistAmount[id]*100.0, dur);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_SCUT_MENTAL_REDUCERE", g_ResistAmount[id]*100.0, dur);
 		}
 		case 2: // Valul de Putere - AoE knockback + small dmg
 		{
@@ -2085,7 +2087,7 @@ stock skill_warrior_mental(id, slot, lvl)
 				}
 			}
 			apply_skill_cooldown(id, 2, 18.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Valul de Putere: %d inamici loviti!", hit);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_VALUL_DE_PUTERE", hit);
 		}
 		case 3: // Concentrare - buff damage + crit chance
 		{
@@ -2096,7 +2098,7 @@ stock skill_warrior_mental(id, slot, lvl)
 			set_user_rendering(id, kRenderFxGlowShell, 180, 180, 255, kRenderNormal, 40);
 			set_task(dur, "RemoveAura", id);
 			apply_skill_cooldown(id, 3, 17.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Concentrare: +damage + urmatorul atac CRIT x2 (%.1f sec)!", dur);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_CONCENTRARE_DAMAGE_URMATORUL", dur);
 		}
 		case 4: // Explozie Interioara - self damage + big AoE
 		{
@@ -2124,7 +2126,7 @@ stock skill_warrior_mental(id, slot, lvl)
 				}
 			}
 			apply_skill_cooldown(id, 4, 26.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Explozie Interioara: AoE %.0f dmg | Inamici: %d", dmg, hit);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_EXPLOZIE_INTERIOARA_AOE", dmg, hit);
 		}
 	}
 }
@@ -2151,12 +2153,12 @@ stock skill_sura_neagra(id, slot, lvl)
 				set_task(1.0, "DarkFlameTick", taskid, _, _, "a", ticks);
 				
 				apply_skill_cooldown(id, 0, 15.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Flacara Intunecata: damage + DoT!");
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_FLACARA_INTUNECATA_DAMAGE");
 			}
 			else
 			{
 				apply_skill_cooldown(id, 0, 15.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_NICIO_TINTA_VALIDA_2");
 			}
 		}
 		case 1: // Blestem - reduce stats inamic
@@ -2173,12 +2175,12 @@ stock skill_sura_neagra(id, slot, lvl)
 				set_task(slow_dur + 0.5, "RemoveReflect", target);
 				
 				apply_skill_cooldown(id, 1, 20.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Blestem: tinta incetinita + debuff (%.1f sec)!", slow_dur);
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_BLESTEM_TINTA_INCETINITA", slow_dur);
 			}
 			else
 			{
 				apply_skill_cooldown(id, 1, 20.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_NICIO_TINTA_VALIDA_2");
 			}
 		}
 		case 2: // Absorbție de Suflet - lifesteal
@@ -2194,12 +2196,12 @@ stock skill_sura_neagra(id, slot, lvl)
 				set_user_health(id, min(hp + heal, 100 + g_Player[id][g_HP] * 10 + 80));
 				
 				apply_skill_cooldown(id, 2, 14.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Absorbție de Suflet: %.0f dmg + %d HP!", dmg, heal);
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_ABSORBTIE_DE_SUFLET", dmg, heal);
 			}
 			else
 			{
 				apply_skill_cooldown(id, 2, 14.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_NICIO_TINTA_VALIDA_2");
 			}
 		}
 		case 3: // Umbre - invis + speed
@@ -2211,7 +2213,7 @@ stock skill_sura_neagra(id, slot, lvl)
 			set_task(dur, "RemoveInvis", id);
 			set_task(dur, "RestoreSpeed", id);
 			apply_skill_cooldown(id, 3, 22.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Umbre: aproape invizibil + viteza (%.1f sec)!", dur);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_UMBRE_APROAPE_INVIZIBIL", dur);
 		}
 		case 4: // Invocarea Haosului - big AoE dark
 		{
@@ -2236,7 +2238,7 @@ stock skill_sura_neagra(id, slot, lvl)
 				}
 			}
 			apply_skill_cooldown(id, 4, 28.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Invocarea Haosului: AoE %.0f dmg | Inamici: %d", dmg, hit);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_INVOCAREA_HAOSULUI_AOE", dmg, hit);
 		}
 	}
 }
@@ -2281,7 +2283,7 @@ stock skill_ninja_arc(id, slot, lvl)
 				}
 			}
 			apply_skill_cooldown(id, 0, 18.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Ploaie de Sageti: %.0f dmg | Inamici: %d", dmg, hit);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_PLOAIE_DE_SAGETI_2", dmg, hit);
 		}
 		case 1: // Sageata Exploziva
 		{
@@ -2307,19 +2309,19 @@ stock skill_ninja_arc(id, slot, lvl)
 				}
 				
 				apply_skill_cooldown(id, 1, 16.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Sageata Exploziva: %.0f dmg + AoE!", dmg);
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_SAGEATA_EXPLOZIVA_DMG", dmg);
 			}
 			else
 			{
 				apply_skill_cooldown(id, 1, 16.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_NICIO_TINTA_VALIDA_2");
 			}
 		}
 		case 2: // Tintire Precisa - next hit guaranteed high damage
 		{
 			g_AmbushActive[id] = true; // x3 crit
 			apply_skill_cooldown(id, 2, 12.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Tintire Precisa: urmatorul atac este CRITIC x3!");
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_TINTIRE_PRECISA_URMATORUL");
 		}
 		case 3: // Sageata Otravita
 		{
@@ -2332,12 +2334,12 @@ stock skill_ninja_arc(id, slot, lvl)
 				set_task(1.0, "PoisonTick", taskid, _, _, "a", ticks);
 				
 				apply_skill_cooldown(id, 3, 15.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Sageata Otravita: DoT puternic (%d tick-uri)!", ticks);
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_SAGEATA_OTRAVITA_DOT", ticks);
 			}
 			else
 			{
 				apply_skill_cooldown(id, 3, 15.0);
-				client_print_color(id, print_team_default, "^4[Metin2]^1 Nicio tinta valida.");
+				client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_NICIO_TINTA_VALIDA_2");
 			}
 		}
 		case 4: // Val de Sageti - rapid fire AoE
@@ -2363,7 +2365,7 @@ stock skill_ninja_arc(id, slot, lvl)
 				}
 			}
 			apply_skill_cooldown(id, 4, 24.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Val de Sageti: %.0f dmg | Inamici: %d", dmg, hit);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_VAL_DE_SAGETI", dmg, hit);
 		}
 	}
 }
@@ -2391,7 +2393,7 @@ stock skill_shaman_fulger(id, slot, lvl)
 			
 			set_user_health(id, min(hp + heal, maxhp));
 			apply_skill_cooldown(id, 0, 10.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Lecuire: +%d HP!", heal);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_LECUIRE_HP", heal);
 		}
 		case 1: // Atac Intens
 		{
@@ -2401,7 +2403,7 @@ stock skill_shaman_fulger(id, slot, lvl)
 			set_user_rendering(id, kRenderFxGlowShell, 255, 220, 50, kRenderNormal, 40);
 			set_task(dur, "RemoveAura", id);
 			apply_skill_cooldown(id, 1, 26.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Atac Intens: +damage (%.1f sec)!", dur);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_ATAC_INTENS_DAMAGE", dur);
 		}
 		case 2: // Binecuvantare
 		{
@@ -2413,7 +2415,7 @@ stock skill_shaman_fulger(id, slot, lvl)
 			set_user_rendering(id, kRenderFxGlowShell, 80, 255, 120, kRenderNormal, 35);
 			set_task(dur, "RemoveBless", id);
 			apply_skill_cooldown(id, 2, 22.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Binecuvantare: +%.0f defense (%.1f sec)!", g_BlessAmount[id], dur);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_BINECUVANTARE_DEFENSE_SEC", g_BlessAmount[id], dur);
 		}
 		case 3: // Iutesenie - reset CD
 		{
@@ -2424,7 +2426,7 @@ stock skill_shaman_fulger(id, slot, lvl)
 			new Float:base_cd = 50.0 - (float(g_Player[id][g_Level]) * 0.15) - (float(lvl) * 0.2);
 			if (base_cd < 35.0) base_cd = 35.0;
 			apply_skill_cooldown(id, 3, base_cd);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Iutesenie: toate cooldown-urile resetate!");
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_IUTESENIE_TOATE_COOLDOWN");
 		}
 		case 4: // Chemarea Fulgerului
 		{
@@ -2469,7 +2471,7 @@ stock skill_shaman_fulger(id, slot, lvl)
 			}
 			
 			apply_skill_cooldown(id, 4, 26.0);
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Chemarea Fulgerului: flash + stun (%d)!", stunned);
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_CHEMAREA_FULGERULUI_FLASH", stunned);
 		}
 	}
 }
@@ -2567,8 +2569,8 @@ public cmd_admin_set_level(id, level, cid)
 	recalc_max_mp(target);
 	save_player(target);
 	
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai setat level-ul lui ^3%n^1 la ^3%d", target, newlevel);
-	client_print_color(target, print_team_default, "^4[Metin2]^1 Un admin ti-a setat level-ul la ^3%d", newlevel);
+	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_SETAT_LEVEL", target, newlevel);
+	client_print_color(target, print_team_default, "%L", target, "METIN2_METIN2_UN_ADMIN_TI", newlevel);
 	
 	return PLUGIN_HANDLED;
 }
@@ -2591,8 +2593,8 @@ public cmd_admin_set_xp(id, level, cid)
 	g_Player[target][g_XP] = newxp;
 	save_player(target);
 	
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai setat XP-ul lui ^3%n^1 la ^3%d", target, newxp);
-	client_print_color(target, print_team_default, "^4[Metin2]^1 Un admin ti-a setat XP-ul la ^3%d", newxp);
+	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_SETAT_XP", target, newxp);
+	client_print_color(target, print_team_default, "%L", target, "METIN2_METIN2_UN_ADMIN_TI_2", newxp);
 	
 	return PLUGIN_HANDLED;
 }
@@ -2615,8 +2617,8 @@ public cmd_admin_set_statuspoints(id, level, cid)
 	g_Player[target][g_StatPoints] = points;
 	save_player(target);
 	
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai setat Status Points lui ^3%n^1 la ^3%d", target, points);
-	client_print_color(target, print_team_default, "^4[Metin2]^1 Un admin ti-a setat Status Points la ^3%d", points);
+	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_SETAT_STATUS", target, points);
+	client_print_color(target, print_team_default, "%L", target, "METIN2_METIN2_UN_ADMIN_TI_3", points);
 	
 	return PLUGIN_HANDLED;
 }
@@ -2639,8 +2641,8 @@ public cmd_admin_set_yang(id, level, cid)
 	g_Player[target][g_Yang] = yang;
 	save_player(target);
 	
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai setat Yang-ul lui ^3%n^1 la ^3%d", target, yang);
-	client_print_color(target, print_team_default, "^4[Metin2]^1 Un admin ti-a setat Yang-ul la ^3%d", yang);
+	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_SETAT_YANG", target, yang);
+	client_print_color(target, print_team_default, "%L", target, "METIN2_METIN2_UN_ADMIN_TI_4", yang);
 	
 	return PLUGIN_HANDLED;
 }
@@ -2663,8 +2665,8 @@ public cmd_admin_set_skillpoints(id, level, cid)
 	g_Player[target][g_SkillPoints] = points;
 	save_player(target);
 	
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai setat Skill Points lui ^3%n^1 la ^3%d", target, points);
-	client_print_color(target, print_team_default, "^4[Metin2]^1 Un admin ti-a setat Skill Points la ^3%d", points);
+	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_SETAT_SKILL", target, points);
+	client_print_color(target, print_team_default, "%L", target, "METIN2_METIN2_UN_ADMIN_TI_5", points);
 	
 	return PLUGIN_HANDLED;
 }
@@ -2673,14 +2675,14 @@ public cmd_admin_set_skillpoints(id, level, cid)
 
 public cmd_menu(id)
 {
-	new menu = menu_create("\y[Metin2] Meniu Principal", "menu_handler");
-	menu_additem(menu, "Alege Rasa", "1");
-	menu_additem(menu, "Statut / Alocare Puncte", "2");
-	menu_additem(menu, "Skill-uri", "3");
-	menu_additem(menu, "Inventar & Echipare", "4");
-	menu_additem(menu, "Fierar (Upgrade)", "5");
-	menu_additem(menu, "Magazin", "6");
-	menu_additem(menu, "Ghid Bind-uri", "7");
+	new menu = menu_create(fmt("%L", id, "METIN2_METIN2_MENIU_PRINCIPAL"), "menu_handler");
+	menu_additem(menu, fmt("%L", id, "ALEGE_RASA"), "1");
+	menu_additem(menu, fmt("%L", id, "STATUT_ALOCARE_PUNCTE"), "2");
+	menu_additem(menu, fmt("%L", id, "SKILL_URI"), "3");
+	menu_additem(menu, fmt("%L", id, "INVENTAR_ECHIPARE"), "4");
+	menu_additem(menu, fmt("%L", id, "FIERAR_UPGRADE"), "5");
+	menu_additem(menu, fmt("%L", id, "MAGAZIN"), "6");
+	menu_additem(menu, fmt("%L", id, "GHID_BIND_URI"), "7");
 	menu_setprop(menu, MPROP_EXIT, MEXIT_ALL);
 	menu_display(id, menu);
 	return PLUGIN_HANDLED;
@@ -2719,15 +2721,15 @@ stock show_race_menu(id)
 {
 	if (g_Player[id][g_Race] != RACE_NONE)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Ai deja rasa aleasa: ^3%s", g_RaceName[g_Player[id][g_Race]]);
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_DEJA_RASA", g_RaceName[g_Player[id][g_Race]]);
 		return;
 	}
 	
-	new menu = menu_create("\yAlege Rasa", "race_handler");
-	menu_additem(menu, "Razboinic - Putere bruta", "1");
-	menu_additem(menu, "Sura - Magie & Reflect", "2");
-	menu_additem(menu, "Ninja - Viteza & Crit", "3");
-	menu_additem(menu, "Saman - Support & Heal", "4");
+	new menu = menu_create(fmt("%L", id, "ALEGE_RASA_2"), "race_handler");
+	menu_additem(menu, fmt("%L", id, "RAZBOINIC_PUTERE_BRUTA"), "1");
+	menu_additem(menu, fmt("%L", id, "SURA_MAGIE_REFLECT"), "2");
+	menu_additem(menu, fmt("%L", id, "NINJA_VITEZA_CRIT"), "3");
+	menu_additem(menu, fmt("%L", id, "SAMAN_SUPPORT_HEAL"), "4");
 	menu_display(id, menu);
 }
 
@@ -2758,7 +2760,7 @@ public race_handler(id, menu, item)
 	recalc_max_mp(id);
 	g_Player[id][g_MP] = g_Player[id][g_MaxMP];
 	
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai ales rasa: ^3%s^1!", g_RaceName[race]);
+	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_ALES_RASA", g_RaceName[race]);
 	save_player(id);
 	
 	new ret;
@@ -2778,8 +2780,7 @@ stock show_path_menu(id)
 	
 	if (g_Player[id][g_SkillPath] != PATH_NONE)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Ai deja calea aleasa: ^3%s", 
-			g_PathName[g_Player[id][g_Race]][g_Player[id][g_SkillPath]-1]);
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_DEJA_CALEA", g_PathName[g_Player[id][g_Race]][g_Player[id][g_SkillPath]-1]);
 		return;
 	}
 	
@@ -2813,8 +2814,7 @@ public path_handler(id, menu, item)
 	new path = str_to_num(data);
 	g_Player[id][g_SkillPath] = path;
 	
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai ales calea: ^3%s^1!", 
-		g_PathName[g_Player[id][g_Race]][path-1]);
+	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_ALES_CALEA", g_PathName[g_Player[id][g_Race]][path-1]);
 	
 	save_player(id);
 	
@@ -2826,7 +2826,7 @@ public cmd_stats(id)
 {
 	if (g_Player[id][g_Race] == RACE_NONE)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Alege mai intai o rasa!");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_ALEGE_MAI_INTAI");
 		return PLUGIN_HANDLED;
 	}
 	
@@ -2843,7 +2843,7 @@ public cmd_stats(id)
 	menu_additem(menu, tmp, "3");
 	formatex(tmp, charsmax(tmp), "INT: %d  [+]", g_Player[id][g_INT]);
 	menu_additem(menu, tmp, "4");
-	menu_additem(menu, "\rInapoi", "0");
+	menu_additem(menu, fmt("%L", id, "INAPOI"), "0");
 	
 	menu_display(id, menu);
 	return PLUGIN_HANDLED;
@@ -2872,7 +2872,7 @@ public stats_handler(id, menu, item)
 	
 	if (g_Player[id][g_StatPoints] <= 0)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Nu ai puncte de statut!");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_NU_AI_PUNCTE");
 		cmd_stats(id);
 		return PLUGIN_HANDLED;
 	}
@@ -2888,7 +2888,7 @@ public stats_handler(id, menu, item)
 	}
 	
 	recalc_max_mp(id);
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Punct alocat!");
+	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_PUNCT_ALOCAT");
 	save_player(id);
 	
 	// Forward
@@ -2914,13 +2914,13 @@ public cmd_skills(id)
 {
 	if (g_Player[id][g_Race] == RACE_NONE)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Alege mai intai o rasa!");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_ALEGE_MAI_INTAI");
 		return PLUGIN_HANDLED;
 	}
 	
 	if (g_Player[id][g_SkillPath] == PATH_NONE)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Alege mai intai calea de skill-uri!");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_ALEGE_MAI_INTAI_2");
 		show_path_menu(id);
 		return PLUGIN_HANDLED;
 	}
@@ -2948,7 +2948,7 @@ public cmd_skills(id)
 		formatex(info, charsmax(info), "%d", start + i);
 		menu_additem(menu, tmp, info);
 	}
-	menu_additem(menu, "\rInapoi", "999");
+	menu_additem(menu, fmt("%L", id, "INAPOI"), "999");
 	
 	menu_display(id, menu);
 	return PLUGIN_HANDLED;
@@ -2977,14 +2977,14 @@ public skills_handler(id, menu, item)
 	
 	if (g_Player[id][g_SkillPoints] <= 0)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Nu ai puncte de skill!");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_NU_AI_PUNCTE_2");
 		cmd_skills(id);
 		return PLUGIN_HANDLED;
 	}
 	
 	if (g_Player[id][g_SkillLevel][skill_idx] >= 40)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Skill deja Perfect Master!");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_SKILL_DEJA_PERFECT");
 		cmd_skills(id);
 		return PLUGIN_HANDLED;
 	}
@@ -2994,7 +2994,7 @@ public skills_handler(id, menu, item)
 	
 	new rank[16];
 	get_skill_rank(g_Player[id][g_SkillLevel][skill_idx], rank, charsmax(rank));
-	client_print_color(id, print_team_default, "^4[Metin2]^1 %s -> ^3%s", g_SkillName[skill_idx], rank);
+	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2", g_SkillName[skill_idx], rank);
 	
 	save_player(id);
 	
@@ -3010,12 +3010,12 @@ public skills_handler(id, menu, item)
 
 public cmd_inventar(id)
 {
-	new menu = menu_create("\yInventar & Echipament", "inv_handler");
-	menu_additem(menu, "Vezi echipament curent", "1");
-	menu_additem(menu, "Echipeaza din inventar", "2");
-	menu_additem(menu, "Dezbraca slot", "3");
-	menu_additem(menu, "Foloseste Lichior HP/MP", "4");
-	menu_additem(menu, "\rInapoi", "0");
+	new menu = menu_create(fmt("%L", id, "INVENTAR_ECHIPAMENT"), "inv_handler");
+	menu_additem(menu, fmt("%L", id, "VEZI_ECHIPAMENT_CURENT"), "1");
+	menu_additem(menu, fmt("%L", id, "ECHIPEAZA_DIN_INVENTAR"), "2");
+	menu_additem(menu, fmt("%L", id, "DEZBRACA_SLOT"), "3");
+	menu_additem(menu, fmt("%L", id, "FOLOSESTE_LICHIOR_HP_MP"), "4");
+	menu_additem(menu, fmt("%L", id, "INAPOI"), "0");
 	menu_display(id, menu);
 	return PLUGIN_HANDLED;
 }
@@ -3179,7 +3179,7 @@ stock get_item_name(itemid)
 
 stock show_equip_from_inv(id)
 {
-	new menu = menu_create("\yAlege item din inventar", "equip_handler");
+	new menu = menu_create(fmt("%L", id, "ALEGE_ITEM_DIN_INVENTAR"), "equip_handler");
 	
 	for (new i = 0; i < g_Player[id][g_InventoryCount]; i++)
 	{
@@ -3193,7 +3193,7 @@ stock show_equip_from_inv(id)
 			menu_additem(menu, tmp, info);
 		}
 	}
-	menu_additem(menu, "\rInapoi", "999");
+	menu_additem(menu, fmt("%L", id, "INAPOI"), "999");
 	
 	menu_display(id, menu);
 }
@@ -3277,10 +3277,9 @@ public equip_handler(id, menu, item)
 	recalc_max_mp(id);
 	
 	if (old_itemid > 0)
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Ai schimbat ^3%s +%d^1 cu ^3%s +%d", 
-			g_Items[old_itemid][ItemName], old_upg, g_Items[itemid][ItemName], upg);
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_SCHIMBAT_CU", g_Items[old_itemid][ItemName], old_upg, g_Items[itemid][ItemName], upg);
 	else
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Ai echipat ^3%s +%d", g_Items[itemid][ItemName], upg);
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_ECHIPAT", g_Items[itemid][ItemName], upg);
 	
 	save_player(id);
 	
@@ -3294,14 +3293,14 @@ public equip_handler(id, menu, item)
 
 stock show_unequip(id)
 {
-	new menu = menu_create("\yDezbraca slot", "unequip_handler");
-	menu_additem(menu, "Arma", "0");
-	menu_additem(menu, "Armura", "1");
-	menu_additem(menu, "Coif", "2");
-	menu_additem(menu, "Scut", "3");
-	menu_additem(menu, "Papuci", "4");
-	menu_additem(menu, "Bijuterie", "5");
-	menu_additem(menu, "\rInapoi", "999");
+	new menu = menu_create(fmt("%L", id, "DEZBRACA_SLOT_2"), "unequip_handler");
+	menu_additem(menu, fmt("%L", id, "ARMA"), "0");
+	menu_additem(menu, fmt("%L", id, "ARMURA"), "1");
+	menu_additem(menu, fmt("%L", id, "COIF"), "2");
+	menu_additem(menu, fmt("%L", id, "SCUT"), "3");
+	menu_additem(menu, fmt("%L", id, "PAPUCI"), "4");
+	menu_additem(menu, fmt("%L", id, "BIJUTERIE"), "5");
+	menu_additem(menu, fmt("%L", id, "INAPOI"), "999");
 	menu_display(id, menu);
 }
 
@@ -3326,14 +3325,14 @@ public unequip_handler(id, menu, item)
 	
 	if (g_Player[id][g_Equipped][slot] == 0)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Slot gol!");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_SLOT_GOL");
 		show_unequip(id);
 		return PLUGIN_HANDLED;
 	}
 	
 	if (g_Player[id][g_InventoryCount] >= MAX_INVENTORY)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Inventar plin!");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_INVENTAR_PLIN");
 		show_unequip(id);
 		return PLUGIN_HANDLED;
 	}
@@ -3349,7 +3348,7 @@ public unequip_handler(id, menu, item)
 	g_Player[id][g_EquippedUpgrade][slot] = 0;
 	
 	recalc_max_mp(id);
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Item mutat in inventar.");
+	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_ITEM_MUTAT_IN");
 	save_player(id);
 	
 	// Forward
@@ -3362,7 +3361,7 @@ public unequip_handler(id, menu, item)
 
 stock use_potion_menu(id)
 {
-	new menu = menu_create("\yFoloseste Lichior", "potion_handler");
+	new menu = menu_create(fmt("%L", id, "FOLOSESTE_LICHIOR"), "potion_handler");
 	
 	for (new i = 0; i < g_Player[id][g_InventoryCount]; i++)
 	{
@@ -3376,7 +3375,7 @@ stock use_potion_menu(id)
 			menu_additem(menu, tmp, info);
 		}
 	}
-	menu_additem(menu, "\rInapoi", "999");
+	menu_additem(menu, fmt("%L", id, "INAPOI"), "999");
 	
 	menu_display(id, menu);
 }
@@ -3414,16 +3413,16 @@ public potion_handler(id, menu, item)
 	{
 		new hp = get_user_health(id);
 		set_user_health(id, min(hp + 80, 100 + g_Player[id][g_HP] * 10 + 50));
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Ai folosit Lichior HP!");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_FOLOSIT_LICHIOR");
 	}
 	else if (potion_type == 2) // MP
 	{
 		g_Player[id][g_MP] = min(g_Player[id][g_MP] + 60, g_Player[id][g_MaxMP]);
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Ai folosit Lichior MP!");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_FOLOSIT_LICHIOR_2");
 	}
 	else // custom - fara efect predefinit, tratat de un plugin extern prin forward-ul m2_item_used
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Ai folosit ^3%s^1!", g_Items[itemid][ItemName]);
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_FOLOSIT", g_Items[itemid][ItemName]);
 	}
 	
 	// Scoate din inventar
@@ -3448,7 +3447,7 @@ public potion_handler(id, menu, item)
 
 public cmd_upgrade(id)
 {
-	new menu = menu_create("\yFierar - Upgrade Item", "upgrade_menu_handler");
+	new menu = menu_create(fmt("%L", id, "FIERAR_UPGRADE_ITEM"), "upgrade_menu_handler");
 	
 	for (new i = 0; i < g_Player[id][g_InventoryCount]; i++)
 	{
@@ -3466,7 +3465,7 @@ public cmd_upgrade(id)
 			}
 		}
 	}
-	menu_additem(menu, "\rInapoi", "999");
+	menu_additem(menu, fmt("%L", id, "INAPOI"), "999");
 	
 	menu_display(id, menu);
 	return PLUGIN_HANDLED;
@@ -3496,7 +3495,7 @@ public upgrade_menu_handler(id, menu, item)
 	
 	if (g_Player[id][g_Yang] < cost)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Nu ai destul Yang! Cost: %d", cost);
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_NU_AI_DESTUL", cost);
 		cmd_upgrade(id);
 		return PLUGIN_HANDLED;
 	}
@@ -3510,7 +3509,7 @@ public upgrade_menu_handler(id, menu, item)
 	{
 		chance = 100;
 		g_ForceUpgrade[id] = false; // se consuma la aceasta incercare, indiferent de rezultat
-		client_print_color(id, print_team_default, "^4[Metin2]^1 ^3Pergamentul Binecuvantarii^1 e activ - succes garantat!");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_PERGAMENTUL_BINECUVANTARII_ACTIV");
 	}
 	else if (upg < 6) chance = 85 - (upg * 5);
 	else if (upg == 6) chance = 50;
@@ -3522,7 +3521,7 @@ public upgrade_menu_handler(id, menu, item)
 	if (random_num(1, 100) <= chance)
 	{
 		g_Player[id][g_InventoryUpgrade][inv_slot]++;
-		client_print_color(id, print_team_default, "^4[Metin2]^1 ^3SUCCES^1! Item +%d", g_Player[id][g_InventoryUpgrade][inv_slot]);
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_SUCCES_ITEM", g_Player[id][g_InventoryUpgrade][inv_slot]);
 		
 		// Forward success
 		new ret;
@@ -3544,12 +3543,12 @@ public upgrade_menu_handler(id, menu, item)
 			g_Player[id][g_InventoryCount]--;
 
 			destroyed = 1;
-			client_print_color(id, print_team_default, "^4[Metin2]^1 ^1FIERARUL A SPART ITEMUL!");
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_FIERARUL_SPART_ITEMUL");
 		}
 		else
 		{
 			if (upg > 0) g_Player[id][g_InventoryUpgrade][inv_slot]--;
-			client_print_color(id, print_team_default, "^4[Metin2]^1 Esec! Nivel scazut.");
+			client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_ESEC_NIVEL_SCAZUT");
 		}
 		
 		// Forward fail
@@ -3579,7 +3578,7 @@ public cmd_shop(id)
 		formatex(info, charsmax(info), "%d", i);
 		menu_additem(menu, tmp, info);
 	}
-	menu_additem(menu, "\rInapoi", "0");
+	menu_additem(menu, fmt("%L", id, "INAPOI"), "0");
 	
 	menu_display(id, menu);
 	return PLUGIN_HANDLED;
@@ -3612,7 +3611,7 @@ public shop_handler(id, menu, item)
 	
 	if (g_Player[id][g_InventoryCount] >= MAX_INVENTORY)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Inventar plin!");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_INVENTAR_PLIN");
 		cmd_shop(id);
 		return PLUGIN_HANDLED;
 	}
@@ -3620,7 +3619,7 @@ public shop_handler(id, menu, item)
 	new price = g_Items[itemid][ItemPrice];
 	if (g_Player[id][g_Yang] < price)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Yang insuficient!");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_YANG_INSUFICIENT");
 		cmd_shop(id);
 		return PLUGIN_HANDLED;
 	}
@@ -3632,7 +3631,7 @@ public shop_handler(id, menu, item)
 	g_Player[id][g_InventoryUpgrade][idx] = 0;
 	g_Player[id][g_InventoryCount]++;
 	
-	client_print_color(id, print_team_default, "^4[Metin2]^1 Ai cumparat ^3%s", g_Items[itemid][ItemName]);
+	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_CUMPARAT", g_Items[itemid][ItemName]);
 	
 	// Forward
 	new ret;
@@ -3650,7 +3649,7 @@ public cmd_status_motd(id)
 	
 	if (g_Player[id][g_Race] == RACE_NONE)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2]^1 Alege mai intai o rasa cu ^3/menu^1!");
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_ALEGE_MAI_INTAI_3");
 		return PLUGIN_HANDLED;
 	}
 	
