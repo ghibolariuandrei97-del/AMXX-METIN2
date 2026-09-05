@@ -408,6 +408,7 @@ public plugin_init()
 	register_concmd("amx_set_statuspoints", "cmd_admin_set_statuspoints", ADMIN_LEVEL_A, "<nume/#userid> <puncte>");
 	register_concmd("amx_set_skillpoints",  "cmd_admin_set_skillpoints",  ADMIN_LEVEL_A, "<nume/#userid> <puncte>");
 	register_concmd("amx_set_yang", "cmd_admin_set_yang", ADMIN_LEVEL_A, "<nume/#userid> <yang>");
+	register_concmd("amx_metin2_resetvault", "cmd_admin_reset_vault", ADMIN_RCON, "Reseteaza complet vault-ul Metin2");
 	
 	cvar_xp_kill         = register_cvar("amx_metin2_xp_kill", "100");
 	cvar_xp_hs           = register_cvar("amx_metin2_xp_hs_bonus", "50");
@@ -477,37 +478,37 @@ public plugin_end()
 
 stock RegisterDefaultItems()
 {
-	// ID 0 = Gol (obligatoriu)
-	RegisterItemInternal("Gol",              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+	// ID 0 = Empty (required)
+	RegisterItemInternal("Empty",            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
 	// Weapons
-	RegisterItemInternal("Luna Plina",       ITEM_WEAPON, 1, 0, 5, 0, 2, 0, 3, 0, 15000, 0);
-	RegisterItemInternal("Tais Barbar",      ITEM_WEAPON, 1, 0, 8, 0, 0, 0, 5, 0, 22000, 0);
-	RegisterItemInternal("Nimfa",            ITEM_WEAPON, 1, 0, 3, 0, 4, 2, 2, 0, 18000, 0);
+	RegisterItemInternal("Full Moon",        ITEM_WEAPON, 1, 0, 5, 0, 2, 0, 3, 0, 15000, 0);
+	RegisterItemInternal("Barbarian Blade",  ITEM_WEAPON, 1, 0, 8, 0, 0, 0, 5, 0, 22000, 0);
+	RegisterItemInternal("Nymph",            ITEM_WEAPON, 1, 0, 3, 0, 4, 2, 2, 0, 18000, 0);
 
 	// Armor
-	RegisterItemInternal("Armura Posedata",  ITEM_ARMOR,  1, 0, 0,15, 0, 0, 0, 0, 12000, 0);
-	RegisterItemInternal("Armura Monstruoasa",ITEM_ARMOR,1, 0, 2,25, 0, 0, 0, 0, 20000, 0);
+	RegisterItemInternal("Possessed Armor",  ITEM_ARMOR,  1, 0, 0,15, 0, 0, 0, 0, 12000, 0);
+	RegisterItemInternal("Monstrous Armor",  ITEM_ARMOR,  1, 0, 2,25, 0, 0, 0, 0, 20000, 0);
 
 	// Helmet
-	RegisterItemInternal("Coif de Fier",     ITEM_HELMET, 1, 0, 1, 5, 1, 0, 0, 0,  8000, 0);
-	RegisterItemInternal("Coif Dragon",      ITEM_HELMET, 1, 0, 3,10, 2, 0, 1, 0, 15000, 0);
+	RegisterItemInternal("Iron Helmet",      ITEM_HELMET, 1, 0, 1, 5, 1, 0, 0, 0,  8000, 0);
+	RegisterItemInternal("Dragon Helmet",    ITEM_HELMET, 1, 0, 3,10, 2, 0, 1, 0, 15000, 0);
 
 	// Shield
-	RegisterItemInternal("Scut Chinezesc",   ITEM_SHIELD, 1, 0, 0, 8, 0, 0, 0, 0,  9000, 0);
-	RegisterItemInternal("Scut Titan",       ITEM_SHIELD, 1, 0, 2,15, 0, 0, 0, 0, 16000, 0);
+	RegisterItemInternal("Chinese Shield",   ITEM_SHIELD, 1, 0, 0, 8, 0, 0, 0, 0,  9000, 0);
+	RegisterItemInternal("Titan Shield",     ITEM_SHIELD, 1, 0, 2,15, 0, 0, 0, 0, 16000, 0);
 
 	// Shoes
-	RegisterItemInternal("Papuci de Vant",   ITEM_SHOES,  1, 0, 0, 0, 5, 0, 0,15, 11000, 0);
-	RegisterItemInternal("Papuci Spirit",    ITEM_SHOES,  1, 0, 0, 0, 3, 2, 0,20, 14000, 0);
+	RegisterItemInternal("Wind Shoes",       ITEM_SHOES,  1, 0, 0, 0, 5, 0, 0,15, 11000, 0);
+	RegisterItemInternal("Spirit Shoes",     ITEM_SHOES,  1, 0, 0, 0, 3, 2, 0,20, 14000, 0);
 
 	// Jewel
-	RegisterItemInternal("Cercei de Abanos", ITEM_JEWEL,  1, 0, 0, 0, 0, 4, 4, 0, 13000, 0);
-	RegisterItemInternal("Bratara Lunara",   ITEM_JEWEL,  1, 0, 2, 5, 2, 2, 2, 0, 17000, 0);
+	RegisterItemInternal("Ebony Earrings",   ITEM_JEWEL,  1, 0, 0, 0, 0, 4, 4, 0, 13000, 0);
+	RegisterItemInternal("Lunar Bracelet",   ITEM_JEWEL,  1, 0, 2, 5, 2, 2, 2, 0, 17000, 0);
 
 	// Potions
-	RegisterItemInternal("Lichior HP",       ITEM_POTION, 1, 0, 0, 0, 0, 0, 0, 0,   800, 1);
-	RegisterItemInternal("Lichior MP",       ITEM_POTION, 1, 0, 0, 0, 0, 0, 0, 0,   900, 2);
+	RegisterItemInternal("HP Potion",        ITEM_POTION, 1, 0, 0, 0, 0, 0, 0, 0,   800, 1);
+	RegisterItemInternal("MP Potion",        ITEM_POTION, 1, 0, 0, 0, 0, 0, 0, 0,   900, 2);
 }
 
 stock RegisterItemInternal(const name[], type, req_level, race_req, str, hp, dex, intt, crit, speed, price, potion_type)
@@ -874,7 +875,7 @@ public _m2_get_item_name(plugin, params)
 	new len = get_param(3);
 	if (itemid <= 0 || itemid >= g_ItemCount)
 	{
-		set_string(2, "Gol", len);
+		set_string(2, "Empty", len);
 		return 0;
 	}
 	set_string(2, g_Items[itemid][ItemName], len);
@@ -2775,6 +2776,43 @@ public cmd_admin_set_skillpoints(id, level, cid)
 	return PLUGIN_HANDLED;
 }
 
+public cmd_admin_reset_vault(id, level, cid)
+{
+	if (!cmd_access(id, level, cid, 1))
+		return PLUGIN_HANDLED;
+	
+	if (g_Vault == INVALID_HANDLE)
+	{
+		client_print_color(id, print_team_default, "^4[Metin2]^1 Vault-ul nu este deschis!");
+		return PLUGIN_HANDLED;
+	}
+	
+	// Șterge TOATE înregistrările din vault (de la timestamp 0 până acum + 1)
+	nvault_prune(g_Vault, 0, get_systime() + 1);
+	
+	// Resetăm toți jucătorii online
+	new count = 0;
+	for (new i = 1; i <= MaxClients; i++)
+	{
+		if (!is_user_connected(i) || is_user_bot(i))
+			continue;
+		
+		reset_player(i);
+		g_DataLoaded[i] = true;
+		save_player(i);		// salvează starea curată (level 1 etc.)
+		count++;
+	}
+	
+	client_print_color(0, print_team_default, "^4[Metin2]^1 Vault-ul a fost ^3RESETAT COMPLET^1 de un admin!");
+	client_print_color(0, print_team_default, "^4[Metin2]^1 Toti jucatorii o iau de la zero.");
+	
+	client_print_color(id, print_team_default, "^4[Metin2]^1 Vault resetat cu succes. Jucatori online resetati: ^3%d", count);
+	log_amx("[Metin2] Admin a resetat vault-ul Metin2 cu nvault_prune. %d jucatori online resetati.", count);
+	
+	return PLUGIN_HANDLED;
+}
+
+
 // ======================== MENIURI ========================
 
 public cmd_menu(id)
@@ -3174,54 +3212,66 @@ public client_equipment_motd(id)
 {
     static motd[1024];
     new len = 0;
+    
+    new lang[8];
+    get_user_info(id, "lang", lang, charsmax(lang));
+    new is_en = equali(lang, "en");
 
     // Header
     len = formatex(motd[len], charsmax(motd) - len,
         "<html><body bgcolor=#1a1a1a text=#e0e0e0 style='font-family:Arial;font-size:13px;margin:8px'>");
     
-    len += formatex(motd[len], charsmax(motd) - len,
-        "<b style='color:#4fc3f7;font-size:15px'>[Metin2] Echipament</b><br><br>");
+    if (is_en)
+        len += formatex(motd[len], charsmax(motd) - len, "<b style='color:#4fc3f7;font-size:15px'>[Metin2] Equipment</b><br><br>");
+    else
+        len += formatex(motd[len], charsmax(motd) - len, "<b style='color:#4fc3f7;font-size:15px'>[Metin2] Echipament</b><br><br>");
 
-    // Arma
+    // Weapon
     len += formatex(motd[len], charsmax(motd) - len,
-        "<b style='color:#81c784'>Arma:</b> %s <span style='color:#ffd54f'>+%d</span><br>",
+        "<b style='color:#81c784'>%s:</b> %s <span style='color:#ffd54f'>+%d</span><br>",
+        is_en ? "Weapon" : "Arma",
         get_item_name(g_Player[id][g_Equipped][SLOT_WEAPON]),
         g_Player[id][g_EquippedUpgrade][SLOT_WEAPON]);
 
-    // Armura
+    // Armor
     len += formatex(motd[len], charsmax(motd) - len,
-        "<b style='color:#81c784'>Armura:</b> %s <span style='color:#ffd54f'>+%d</span><br>",
+        "<b style='color:#81c784'>%s:</b> %s <span style='color:#ffd54f'>+%d</span><br>",
+        is_en ? "Armor" : "Armura",
         get_item_name(g_Player[id][g_Equipped][SLOT_ARMOR]),
         g_Player[id][g_EquippedUpgrade][SLOT_ARMOR]);
 
-    // Coif
+    // Helmet
     len += formatex(motd[len], charsmax(motd) - len,
-        "<b style='color:#81c784'>Coif:</b> %s <span style='color:#ffd54f'>+%d</span><br>",
+        "<b style='color:#81c784'>%s:</b> %s <span style='color:#ffd54f'>+%d</span><br>",
+        is_en ? "Helmet" : "Coif",
         get_item_name(g_Player[id][g_Equipped][SLOT_HELMET]),
         g_Player[id][g_EquippedUpgrade][SLOT_HELMET]);
 
-    // Scut
+    // Shield
     len += formatex(motd[len], charsmax(motd) - len,
-        "<b style='color:#81c784'>Scut:</b> %s <span style='color:#ffd54f'>+%d</span><br>",
+        "<b style='color:#81c784'>%s:</b> %s <span style='color:#ffd54f'>+%d</span><br>",
+        is_en ? "Shield" : "Scut",
         get_item_name(g_Player[id][g_Equipped][SLOT_SHIELD]),
         g_Player[id][g_EquippedUpgrade][SLOT_SHIELD]);
 
-    // Papuci
+    // Shoes
     len += formatex(motd[len], charsmax(motd) - len,
-        "<b style='color:#81c784'>Papuci:</b> %s <span style='color:#ffd54f'>+%d</span><br>",
+        "<b style='color:#81c784'>%s:</b> %s <span style='color:#ffd54f'>+%d</span><br>",
+        is_en ? "Shoes" : "Papuci",
         get_item_name(g_Player[id][g_Equipped][SLOT_SHOES]),
         g_Player[id][g_EquippedUpgrade][SLOT_SHOES]);
 
-    // Bijuterie
+    // Jewelry
     len += formatex(motd[len], charsmax(motd) - len,
-        "<b style='color:#81c784'>Bijuterie:</b> %s <span style='color:#ffd54f'>+%d</span>",
+        "<b style='color:#81c784'>%s:</b> %s <span style='color:#ffd54f'>+%d</span>",
+        is_en ? "Jewelry" : "Bijuterie",
         get_item_name(g_Player[id][g_Equipped][SLOT_JEWEL]),
         g_Player[id][g_EquippedUpgrade][SLOT_JEWEL]);
 
-    // Închidere
+    // Close
     len += formatex(motd[len], charsmax(motd) - len, "</body></html>");
 
-    show_motd(id, motd, "[Metin2] Echipament");
+    show_motd(id, motd, is_en ? "[Metin2] Equipment" : "[Metin2] Echipament");
 }
 
 // Calculează STR total (base + iteme + upgrade)
@@ -3296,7 +3346,7 @@ stock get_item_name(itemid)
 {
 	static name[32];
 	if (itemid <= 0 || itemid >= g_ItemCount)
-		formatex(name, charsmax(name), "Gol");
+		formatex(name, charsmax(name), "Empty");
 	else
 		copy(name, charsmax(name), g_Items[itemid][ItemName]);
 	return name;
@@ -3304,7 +3354,7 @@ stock get_item_name(itemid)
 
 stock show_equip_from_inv(id)
 {
-	new menu = menu_create(fmt("%L", id, "ALEGE_ITEM_DIN_INVENTAR"),"equip_handler");
+	new menu = menu_create(fmt("%L", id, "ALEGE_ITEM_DIN_INVENTAR"), "equip_handler");
 	
 	for (new i = 0; i < g_Player[id][g_InventoryCount]; i++)
 	{
@@ -3795,37 +3845,71 @@ public cmd_status_motd(id)
 	new szRace[32];
 	GetRaceName(id, g_Player[id][g_Race], szRace, charsmax(szRace));
 	
+	new lang[8];
+	get_user_info(id, "lang", lang, charsmax(lang));
+	new is_en = equali(lang, "en");
+	
 	// Culori luminoase, contrast bun pe fundal inchis
-	formatex(motd, charsmax(motd),
-		"<html><body bgcolor=#0a0a12 text=#ffffff style='font:13px Arial;margin:6px'>\
-		<b style='color:#ffd700'>[Metin2] Status</b><br>\
-		<font color=#00e5ff>%s</font> | <font color=#b39ddb>%s</font> | Lv <font color=#ffeb3b>%d</font><br>\
-		XP: <font color=#81c784>%d</font>/%d | Yang: <font color=#ffd54f>%d</font><br>\
-		MP: <font color=#64b5f6>%d</font>/%d | SP: %d | SkP: %d<br>\
-		STR:<font color=#ef5350>%d</font> HP:<font color=#ef5350>%d</font> DEX:<font color=#ef5350>%d</font> INT:<font color=#ef5350>%d</font><br><br>\
-		<b style='color:#69f0ae'>Echipament</b><br>\
-		Arma: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
-		Armura: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
-		Coif: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
-		Scut: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
-		Papuci: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
-		Bijuterie: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font>\
-		</body></html>",
-		name,
-		szRace,
-		g_Player[id][g_Level],
-		g_Player[id][g_XP], needed,
-		g_Player[id][g_Yang],
-		g_Player[id][g_MP], g_Player[id][g_MaxMP],
-		g_Player[id][g_StatPoints], g_Player[id][g_SkillPoints],
-		get_total_str(id), get_total_hp(id), get_total_dex(id), get_total_int(id),
-		wpn, g_Player[id][g_EquippedUpgrade][SLOT_WEAPON],
-		arm, g_Player[id][g_EquippedUpgrade][SLOT_ARMOR],
-		hlm, g_Player[id][g_EquippedUpgrade][SLOT_HELMET],
-		shd, g_Player[id][g_EquippedUpgrade][SLOT_SHIELD],
-		sho, g_Player[id][g_EquippedUpgrade][SLOT_SHOES],
-		jwl, g_Player[id][g_EquippedUpgrade][SLOT_JEWEL]
-	);
+	if (is_en)
+	{
+		formatex(motd, charsmax(motd),
+			"<html><body bgcolor=#0a0a12 text=#ffffff style='font:13px Arial;margin:6px'>\
+			<b style='color:#ffd700'>[Metin2] Status</b><br>\
+			<font color=#00e5ff>%s</font> | <font color=#b39ddb>%s</font> | Lv <font color=#ffeb3b>%d</font><br>\
+			XP: <font color=#81c784>%d</font>/%d | Yang: <font color=#ffd54f>%d</font><br>\
+			MP: <font color=#64b5f6>%d</font>/%d | SP: %d | SkP: %d<br>\
+			STR:<font color=#ef5350>%d</font> HP:<font color=#ef5350>%d</font> DEX:<font color=#ef5350>%d</font> INT:<font color=#ef5350>%d</font><br><br>\
+			<b style='color:#69f0ae'>Equipment</b><br>\
+			Weapon: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
+			Armor: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
+			Helmet: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
+			Shield: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
+			Shoes: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
+			Jewelry: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font>\
+			</body></html>",
+			name, szRace, g_Player[id][g_Level],
+			g_Player[id][g_XP], needed, g_Player[id][g_Yang],
+			g_Player[id][g_MP], g_Player[id][g_MaxMP],
+			g_Player[id][g_StatPoints], g_Player[id][g_SkillPoints],
+			get_total_str(id), get_total_hp(id), get_total_dex(id), get_total_int(id),
+			wpn, g_Player[id][g_EquippedUpgrade][SLOT_WEAPON],
+			arm, g_Player[id][g_EquippedUpgrade][SLOT_ARMOR],
+			hlm, g_Player[id][g_EquippedUpgrade][SLOT_HELMET],
+			shd, g_Player[id][g_EquippedUpgrade][SLOT_SHIELD],
+			sho, g_Player[id][g_EquippedUpgrade][SLOT_SHOES],
+			jwl, g_Player[id][g_EquippedUpgrade][SLOT_JEWEL]
+		);
+	}
+	else
+	{
+		formatex(motd, charsmax(motd),
+			"<html><body bgcolor=#0a0a12 text=#ffffff style='font:13px Arial;margin:6px'>\
+			<b style='color:#ffd700'>[Metin2] Status</b><br>\
+			<font color=#00e5ff>%s</font> | <font color=#b39ddb>%s</font> | Lv <font color=#ffeb3b>%d</font><br>\
+			XP: <font color=#81c784>%d</font>/%d | Yang: <font color=#ffd54f>%d</font><br>\
+			MP: <font color=#64b5f6>%d</font>/%d | SP: %d | SkP: %d<br>\
+			STR:<font color=#ef5350>%d</font> HP:<font color=#ef5350>%d</font> DEX:<font color=#ef5350>%d</font> INT:<font color=#ef5350>%d</font><br><br>\
+			<b style='color:#69f0ae'>Echipament</b><br>\
+			Arma: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
+			Armura: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
+			Coif: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
+			Scut: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
+			Papuci: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font><br>\
+			Bijuterie: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font>\
+			</body></html>",
+			name, szRace, g_Player[id][g_Level],
+			g_Player[id][g_XP], needed, g_Player[id][g_Yang],
+			g_Player[id][g_MP], g_Player[id][g_MaxMP],
+			g_Player[id][g_StatPoints], g_Player[id][g_SkillPoints],
+			get_total_str(id), get_total_hp(id), get_total_dex(id), get_total_int(id),
+			wpn, g_Player[id][g_EquippedUpgrade][SLOT_WEAPON],
+			arm, g_Player[id][g_EquippedUpgrade][SLOT_ARMOR],
+			hlm, g_Player[id][g_EquippedUpgrade][SLOT_HELMET],
+			shd, g_Player[id][g_EquippedUpgrade][SLOT_SHIELD],
+			sho, g_Player[id][g_EquippedUpgrade][SLOT_SHOES],
+			jwl, g_Player[id][g_EquippedUpgrade][SLOT_JEWEL]
+		);
+	}
 	
 	show_motd(id, motd, "[Metin2] Status");
 	return PLUGIN_HANDLED;
@@ -3835,29 +3919,61 @@ public cmd_binds(id)
 {
 	static motd[900];
 	
-	formatex(motd, charsmax(motd),
-	"<html><body bgcolor=#0d0d0d text=#e0e0e0>\
-	<center><font color=#ffcc00 size=5><b>Metin2 RPG - Bind-uri</b></font></center><br>\
-	\
-	<font color=#00ff9d><b>Seteaza in consola (~):</b></font><br><br>\
-	\
-	<font color=#ffcc00>bind f skill1</font> - Skill 1<br>\
-	<font color=#ffcc00>bind g skill2</font> - Skill 2<br>\
-	<font color=#ffcc00>bind h skill3</font> - Skill 3<br>\
-	<font color=#ffcc00>bind j skill4</font> - Skill 4<br>\
-	<font color=#ffcc00>bind k skill5</font> - Skill 5<br><br>\
-	\
-	<font color=#00ff9d><b>Comenzi utile:</b></font><br>\
-	/menu - Meniu principal<br>\
-	/stats - Alocare puncte<br>\
-	/skills - Skill-uri<br>\
-	/inventar - Echipament<br>\
-	/upgrade - Fierar<br>\
-	/shop - Magazin<br><br>\
-	\
-	<font color=#aaaaaa>Fiecare skill consuma Mana.<br>\
-	Cooldown-ul scade pe masura ce upgradezi skill-ul.</font>\
-	</body></html>");
+	new lang[8];
+	get_user_info(id, "lang", lang, charsmax(lang));
+	
+	if (equali(lang, "en"))
+	{
+		formatex(motd, charsmax(motd),
+		"<html><body bgcolor=#0d0d0d text=#e0e0e0>\
+		<center><font color=#ffcc00 size=5><b>Metin2 RPG - Binds</b></font></center><br>\
+		\
+		<font color=#00ff9d><b>Set in console (~):</b></font><br><br>\
+		\
+		<font color=#ffcc00>bind f skill1</font> - Skill 1<br>\
+		<font color=#ffcc00>bind g skill2</font> - Skill 2<br>\
+		<font color=#ffcc00>bind h skill3</font> - Skill 3<br>\
+		<font color=#ffcc00>bind j skill4</font> - Skill 4<br>\
+		<font color=#ffcc00>bind k skill5</font> - Skill 5<br><br>\
+		\
+		<font color=#00ff9d><b>Useful commands:</b></font><br>\
+		/menu - Main menu<br>\
+		/stats - Allocate points<br>\
+		/skills - Skills<br>\
+		/inventar - Equipment<br>\
+		/upgrade - Blacksmith<br>\
+		/shop - Shop<br><br>\
+		\
+		<font color=#aaaaaa>Each skill consumes Mana.<br>\
+		Cooldown decreases as you upgrade the skill.</font>\
+		</body></html>");
+	}
+	else
+	{
+		formatex(motd, charsmax(motd),
+		"<html><body bgcolor=#0d0d0d text=#e0e0e0>\
+		<center><font color=#ffcc00 size=5><b>Metin2 RPG - Bind-uri</b></font></center><br>\
+		\
+		<font color=#00ff9d><b>Seteaza in consola (~):</b></font><br><br>\
+		\
+		<font color=#ffcc00>bind f skill1</font> - Skill 1<br>\
+		<font color=#ffcc00>bind g skill2</font> - Skill 2<br>\
+		<font color=#ffcc00>bind h skill3</font> - Skill 3<br>\
+		<font color=#ffcc00>bind j skill4</font> - Skill 4<br>\
+		<font color=#ffcc00>bind k skill5</font> - Skill 5<br><br>\
+		\
+		<font color=#00ff9d><b>Comenzi utile:</b></font><br>\
+		/menu - Meniu principal<br>\
+		/stats - Alocare puncte<br>\
+		/skills - Skill-uri<br>\
+		/inventar - Echipament<br>\
+		/upgrade - Fierar<br>\
+		/shop - Magazin<br><br>\
+		\
+		<font color=#aaaaaa>Fiecare skill consuma Mana.<br>\
+		Cooldown-ul scade pe masura ce upgradezi skill-ul.</font>\
+		</body></html>");
+	}
 	
 	show_motd(id, motd, "Metin2 RPG");
 	return PLUGIN_HANDLED;
