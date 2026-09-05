@@ -126,7 +126,8 @@ new g_ItemCount = 0;
 new cvar_xp_kill, cvar_xp_hs, cvar_yang_kill, cvar_yang_hs;
 new cvar_upgrade_destroy;
 
-new const g_RaceName[][] = {
+// ======================== RASE (RO / EN) ========================
+new const g_RaceName_RO[][] = {
 	"Nespecificat",
 	"Razboinic",
 	"Sura",
@@ -134,7 +135,16 @@ new const g_RaceName[][] = {
 	"Saman"
 };
 
-new const g_SkillName[MAX_SKILLS][] = {
+new const g_RaceName_EN[][] = {
+	"Unspecified",
+	"Warrior",
+	"Sura",
+	"Ninja",
+	"Shaman"
+};
+
+// ======================== SKILL-URI (RO / EN) ========================
+new const g_SkillName_RO[MAX_SKILLS][] = {
 	// ===== WARRIOR - Corporal (0-4) =====
 	"Aura Sabiei", "Corp Rezistent", "Izbitura", "Atac Sabie", "Vartej Sabie",
 	
@@ -160,7 +170,34 @@ new const g_SkillName[MAX_SKILLS][] = {
 	"Lecuire", "Atac Intens", "Binecuvantare", "Iutesenie", "Chemarea Fulgerului"
 };
 
-new const g_PathName[][][] = {
+new const g_SkillName_EN[MAX_SKILLS][] = {
+	// ===== WARRIOR - Corporal (0-4) =====
+	"Sword Aura", "Resistant Body", "Bash", "Sword Strike", "Sword Whirlwind",
+	
+	// ===== WARRIOR - Mental (5-9) =====
+	"Spirit Strike", "Mental Shield", "Power Wave", "Concentration", "Inner Explosion",
+	
+	// ===== SURA - Arme Magice (10-14) =====
+	"Enchanted Blade", "Enchanted Armor", "Finger Strike", "Lightning Attack", "Petrify",
+	
+	// ===== SURA - Magie Neagra (15-19) =====
+	"Dark Flame", "Curse", "Soul Absorption", "Shadows", "Chaos Summon",
+	
+	// ===== NINJA - Lame / Cuțite (20-24) =====
+	"Camouflage", "Lightning Assault", "Ambush", "Poison", "Blade Dance",
+	
+	// ===== NINJA - Arc (25-29) =====
+	"Arrow Rain", "Explosive Arrow", "Precise Aim", "Poisoned Arrow", "Arrow Wave",
+	
+	// ===== SHAMAN - Zmeu / Dragon (30-34) =====
+	"Dragon Call", "Dragon Flame", "Scale Shield", "Dragon Flight", "Dragon Fury",
+	
+	// ===== SHAMAN - Fulger / Vindecare (35-39) =====
+	"Heal", "Intense Attack", "Blessing", "Quickness", "Lightning Call"
+};
+
+// ======================== CĂI (RO / EN) ========================
+new const g_PathName_RO[][][] = {
 	{ "", "" },                          // index 0 nefolosit
 	{ "Corporal", "Mental" },            // Warrior
 	{ "Arme Magice", "Magie Neagra" },   // Sura
@@ -168,8 +205,70 @@ new const g_PathName[][][] = {
 	{ "Zmeu", "Fulger" }                 // Shaman
 };
 
+new const g_PathName_EN[][][] = {
+	{ "", "" },                          // index 0 nefolosit
+	{ "Body", "Mental" },                // Warrior
+	{ "Magic Weapons", "Black Magic" },  // Sura
+	{ "Blades", "Bow" },                 // Ninja
+	{ "Dragon", "Lightning" }            // Shaman
+};
+
 // Cost mana pe skill (baza)
 new const g_SkillManaCost[5] = { 25, 30, 35, 20, 40 };
+
+// ======================== HELPERS MULTI-LANGUAGE ========================
+
+stock GetRaceName(id, race, output[], len)
+{
+	if (race < 0 || race >= sizeof(g_RaceName_RO))
+	{
+		copy(output, len, "???");
+		return;
+	}
+
+	new lang[8];
+	get_user_info(id, "lang", lang, charsmax(lang));
+
+	if (equali(lang, "en"))
+		copy(output, len, g_RaceName_EN[race]);
+	else
+		copy(output, len, g_RaceName_RO[race]);
+}
+
+stock GetSkillName(id, skill_idx, output[], len)
+{
+	if (skill_idx < 0 || skill_idx >= MAX_SKILLS)
+	{
+		copy(output, len, "???");
+		return;
+	}
+
+	new lang[8];
+	get_user_info(id, "lang", lang, charsmax(lang));
+
+	if (equali(lang, "en"))
+		copy(output, len, g_SkillName_EN[skill_idx]);
+	else
+		copy(output, len, g_SkillName_RO[skill_idx]);
+}
+
+stock GetPathName(id, race, path, output[], len)
+{
+	// path trebuie să fie 1 sau 2
+	if (race < 1 || race > 4 || path < 1 || path > 2)
+	{
+		copy(output, len, "???");
+		return;
+	}
+
+	new lang[8];
+	get_user_info(id, "lang", lang, charsmax(lang));
+
+	if (equali(lang, "en"))
+		copy(output, len, g_PathName_EN[race][path - 1]);
+	else
+		copy(output, len, g_PathName_RO[race][path - 1]);
+}
 
 // ======================== FORWARDS & NATIVES ========================
 new g_fwd_SkillUsed;
@@ -1375,7 +1474,10 @@ public Task_HUD()
 		
 		new hp = is_user_alive(target) ? get_user_health(target) : 0;
 		
-		ShowSyncHudMsg(id, g_HudSync, "%L", id, "METIN2_METIN2_LVL_XP_HP", prefix, g_RaceName[g_Player[target][g_Race]], g_Player[target][g_Level], pct, hp, g_Player[target][g_Yang], g_Player[target][g_MP], g_Player[target][g_MaxMP], g_Player[target][g_StatPoints], g_Player[target][g_SkillPoints]);
+		new szRace[32];
+		GetRaceName(id, g_Player[target][g_Race], szRace, charsmax(szRace));
+		
+		ShowSyncHudMsg(id, g_HudSync, "%L", id, "METIN2_METIN2_LVL_XP_HP", prefix, szRace, g_Player[target][g_Level], pct, hp, g_Player[target][g_Yang], g_Player[target][g_MP], g_Player[target][g_MaxMP], g_Player[target][g_StatPoints], g_Player[target][g_SkillPoints]);
 	}
 }
 
@@ -1441,7 +1543,9 @@ stock execute_skill(id, slot)
 	new skill_idx = (race - 1) * 10 + (path - 1) * 5 + slot;
 	new lvl = g_Player[id][g_SkillLevel][skill_idx];
 	
-	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_ACTIVEZI_NIVEL", g_SkillName[skill_idx], lvl);
+	new szSkill[48];
+	GetSkillName(id, skill_idx, szSkill, charsmax(szSkill));
+	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_ACTIVEZI_NIVEL", szSkill, lvl);
 	
 	switch (race)
 	{
@@ -2721,7 +2825,9 @@ stock show_race_menu(id)
 {
 	if (g_Player[id][g_Race] != RACE_NONE)
 	{
-		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_DEJA_RASA", g_RaceName[g_Player[id][g_Race]]);
+		new szRace[32];
+		GetRaceName(id, g_Player[id][g_Race], szRace, charsmax(szRace));
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_DEJA_RASA", szRace);
 		return;
 	}
 	
@@ -2760,7 +2866,9 @@ public race_handler(id, menu, item)
 	recalc_max_mp(id);
 	g_Player[id][g_MP] = g_Player[id][g_MaxMP];
 	
-	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_ALES_RASA", g_RaceName[race]);
+	new szRace[32];
+	GetRaceName(id, race, szRace, charsmax(szRace));
+	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_ALES_RASA", szRace);
 	save_player(id);
 	
 	new ret;
@@ -2780,20 +2888,25 @@ stock show_path_menu(id)
 	
 	if (g_Player[id][g_SkillPath] != PATH_NONE)
 	{
-		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_DEJA_CALEA", g_PathName[g_Player[id][g_Race]][g_Player[id][g_SkillPath]-1]);
+		new szPath[32];
+		GetPathName(id, g_Player[id][g_Race], g_Player[id][g_SkillPath], szPath, charsmax(szPath));
+		client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_DEJA_CALEA", szPath);
 		return;
 	}
 	
+	new szRace[32];
+	GetRaceName(id, g_Player[id][g_Race], szRace, charsmax(szRace));
+	
 	new title[64];
-	formatex(title, charsmax(title), "\yAlege Calea - %s", g_RaceName[g_Player[id][g_Race]]);
+	formatex(title, charsmax(title), "\yAlege Calea - %s", szRace);
 	
 	new menu = menu_create(title, "path_handler");
 	
 	new tmp[48];
-	formatex(tmp, charsmax(tmp), "%s", g_PathName[g_Player[id][g_Race]][0]);
+	GetPathName(id, g_Player[id][g_Race], 1, tmp, charsmax(tmp));
 	menu_additem(menu, tmp, "1");
 	
-	formatex(tmp, charsmax(tmp), "%s", g_PathName[g_Player[id][g_Race]][1]);
+	GetPathName(id, g_Player[id][g_Race], 2, tmp, charsmax(tmp));
 	menu_additem(menu, tmp, "2");
 	
 	menu_display(id, menu);
@@ -2814,7 +2927,9 @@ public path_handler(id, menu, item)
 	new path = str_to_num(data);
 	g_Player[id][g_SkillPath] = path;
 	
-	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_ALES_CALEA", g_PathName[g_Player[id][g_Race]][path-1]);
+	new szPath[32];
+	GetPathName(id, g_Player[id][g_Race], path, szPath, charsmax(szPath));
+	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2_AI_ALES_CALEA", szPath);
 	
 	save_player(id);
 	
@@ -2929,9 +3044,13 @@ public cmd_skills(id)
 	new path = g_Player[id][g_SkillPath];
 	new start = (race - 1) * 10 + (path - 1) * 5;
 	
+	new szRace[32], szPath[32];
+	GetRaceName(id, race, szRace, charsmax(szRace));
+	GetPathName(id, race, path, szPath, charsmax(szPath));
+	
 	new title[80];
 	formatex(title, charsmax(title), "\ySkill-uri %s (%s) - Puncte: %d", 
-		g_RaceName[race], g_PathName[race][path-1], g_Player[id][g_SkillPoints]);
+		szRace, szPath, g_Player[id][g_SkillPoints]);
 	
 	new menu = menu_create(title, "skills_handler");
 	
@@ -2941,8 +3060,11 @@ public cmd_skills(id)
 		new rank[16];
 		get_skill_rank(lvl, rank, charsmax(rank));
 		
+		new szSkill[48];
+		GetSkillName(id, start + i, szSkill, charsmax(szSkill));
+		
 		new tmp[64];
-		formatex(tmp, charsmax(tmp), "%s [%s]", g_SkillName[start + i], rank);
+		formatex(tmp, charsmax(tmp), "%s [%s]", szSkill, rank);
 		
 		new info[8];
 		formatex(info, charsmax(info), "%d", start + i);
@@ -2994,7 +3116,10 @@ public skills_handler(id, menu, item)
 	
 	new rank[16];
 	get_skill_rank(g_Player[id][g_SkillLevel][skill_idx], rank, charsmax(rank));
-	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2", g_SkillName[skill_idx], rank);
+	
+	new szSkill[48];
+	GetSkillName(id, skill_idx, szSkill, charsmax(szSkill));
+	client_print_color(id, print_team_default, "%L", id, "METIN2_METIN2", szSkill, rank);
 	
 	save_player(id);
 	
@@ -3179,7 +3304,7 @@ stock get_item_name(itemid)
 
 stock show_equip_from_inv(id)
 {
-	new menu = menu_create(fmt("%L", id, "ALEGE_ITEM_DIN_INVENTAR"), "equip_handler");
+	new menu = menu_create(fmt("%L", id, "ALEGE_ITEM_DIN_INVENTAR"),"equip_handler");
 	
 	for (new i = 0; i < g_Player[id][g_InventoryCount]; i++)
 	{
@@ -3667,6 +3792,9 @@ public cmd_status_motd(id)
 	copy(sho, charsmax(sho), get_item_name(g_Player[id][g_Equipped][SLOT_SHOES]));
 	copy(jwl, charsmax(jwl), get_item_name(g_Player[id][g_Equipped][SLOT_JEWEL]));
 	
+	new szRace[32];
+	GetRaceName(id, g_Player[id][g_Race], szRace, charsmax(szRace));
+	
 	// Culori luminoase, contrast bun pe fundal inchis
 	formatex(motd, charsmax(motd),
 		"<html><body bgcolor=#0a0a12 text=#ffffff style='font:13px Arial;margin:6px'>\
@@ -3684,7 +3812,7 @@ public cmd_status_motd(id)
 		Bijuterie: <font color=#fff59d>%s</font> <font color=#ffab40>+%d</font>\
 		</body></html>",
 		name,
-		g_RaceName[g_Player[id][g_Race]],
+		szRace,
 		g_Player[id][g_Level],
 		g_Player[id][g_XP], needed,
 		g_Player[id][g_Yang],
