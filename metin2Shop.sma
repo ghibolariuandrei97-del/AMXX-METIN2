@@ -1,10 +1,17 @@
 /*================================================================================
 	Metin2 Shop - Plugin Exterior
-	Versiune 1.1 (Fixat & Optimizat)
+	Versiune 1.2 (Rescris complet - fara task-uri, optimizat anti-overflow)
 	
 	Shop special cu iteme consumabile (durata = runda)
-	Acces: radio1 (Z) / radio2 (X) / radio3 (C)
+	Acces: radio1 (Z) / radio2 (X) / radio3 (C)  sau  say /m2shop
 	Cost: $ (bani CS 1.6)
+	
+	Modificari fata de 1.1:
+	- Eliminat TOATE task-urile (regen, delayed, welcome)
+	- Efectele se aplica INSTANT la cumparare
+	- Regen-urile au fost transformate in boost-uri one-time
+	- Redus drastic client_print_color (cauza principala de SZ overflow)
+	- Cod curat, fara PreThink / Think
 ================================================================================*/
 
 #include <amxmodx>
@@ -16,9 +23,18 @@
 #include <fun>
 #include <metin2_api>
 
+#if !defined fmt
+stock fmt(const szFormat[], any:...)
+{
+	static szBuffer[512];
+	vformat(szBuffer, charsmax(szBuffer), szFormat, 2);
+	return szBuffer;
+}
+#endif
+
 #define PLUGIN  "Metin2Shop"
-#define VERSION "1.1"
-#define AUTHOR  "Craxor"
+#define VERSION "1.2"
+#define AUTHOR  "Craxor & Clean Rewrite"
 
 #define MAX_PLAYERS     32
 #define MAX_SPECIAL     24
@@ -26,92 +42,158 @@
 // ======================== STRUCTURA ITEM SPECIAL ========================
 enum _:SpecialItem
 {
-	SI_Name[48],
-	SI_Desc[64],
-	SI_Cost,            // pret in $
-	SI_Category         // 1=Ofensiv, 2=Defensiv, 3=Special
+	SI_Cost,
+	SI_Category		// 1=Ofensiv, 2=Defensiv, 3=Special
 };
 
 new const g_SpecialItems[MAX_SPECIAL][SpecialItem] =
 {
 	// ========== RADIO1 - OFENSIV (0-7) ==========
-	{ "Inel de Experienta",      "+50% XP din kill-uri",                    5000, 1 },
-	{ "Amuletă Critică",         "+30% șansă crit (x2 dmg)",                4500, 1 },
-	{ "Brățară de Forță",        "+20 STR temporar",                        3500, 1 },
-	{ "Inel de Yang",            "+50% Yang din kill-uri",                  4000, 1 },
-	{ "Amuletă Berserk",         "+40% dmg, -15% defense",                  6000, 1 },
-	{ "Inel de Piercing",        "Ignoră 35% din armura inamicului",        3800, 1 },
-	{ "Amuletă Lifesteal",       "15% din damage ca heal",                  5500, 1 },
-	{ "Brățară Skill Power",     "+25% damage general (skill & arma)",      4800, 1 },
+	{ 5000, 1 },	// 0  Experience Ring
+	{ 4500, 1 },	// 1  Critical Amulet
+	{ 3500, 1 },	// 2  Strength Bracelet
+	{ 4000, 1 },	// 3  Yang Ring
+	{ 6000, 1 },	// 4  Berserk Amulet
+	{ 3800, 1 },	// 5  Piercing Ring
+	{ 5500, 1 },	// 6  Lifesteal Amulet
+	{ 4800, 1 },	// 7  Skill Power Bracelet
 
 	// ========== RADIO2 - DEFENSIV (8-15) ==========
-	{ "Amuletă de Armură",       "+35 defense",                             4200, 2 },
-	{ "Inel de Viață",           "+60 Max HP",                              3800, 2 },
-	{ "Amuletă Regen HP",        "+6 HP / secundă",                         3200, 2 },
-	{ "Inel de Mana",            "+80 Max MP + regen accelerat",            4000, 2 },
-	{ "Amuletă Reflect",         "Reflectă 25% din damage primit",         5200, 2 },
-	{ "Scut Magic",              "Reduce damage-ul primit cu 22%",         4700, 2 },
-	{ "Binecuvântare Divină",    "+20 defense + 4 HP/sec",                 5800, 2 },
-	{ "Papuci de Vânt",          "+60 viteză de mișcare",                   2800, 2 },
+	{ 4200, 2 },	// 8  Armor Amulet
+	{ 3800, 2 },	// 9  Life Ring
+	{ 3200, 2 },	// 10 HP Boost (ex-regen)
+	{ 4000, 2 },	// 11 Mana Ring
+	{ 5200, 2 },	// 12 Reflect Amulet
+	{ 4700, 2 },	// 13 Magic Shield
+	{ 5800, 2 },	// 14 Divine Blessing
+	{ 2800, 2 },	// 15 Wind Shoes
 
 	// ========== RADIO3 - SPECIAL / UTILITY (16-23) ==========
-	{ "Pergament Binecuvântat", "Următorul upgrade = 100% succes",        8500, 3 },
-	{ "Inel de Noroc",           "+30% Yang extra + șansă bonus XP",        4300, 3 },
-	{ "Amuletă de Focus",        "Cooldown skill-uri redus (efectiv)",     6200, 3 },
-	{ "Elixir de Putere",        "+12 la toate stat-urile (STR/HP/DEX/INT)", 7500, 3 },
-	{ "Piatra Spiritului",       "La kill: +40 MP și +25 HP",               4600, 3 },
-	{ "Amuletă Anti-Crit",       "Reduce damage-ul critic primit cu 40%",   3900, 3 },
-	{ "Brățară de Evaziune",     "12% șansă să eviți complet un hit",       5100, 3 },
-	{ "Inel de Regenerare",      "Regen MP +15 / 2 sec + HP mic",           3400, 3 }
+	{ 8500, 3 },	// 16 Blessed Scroll
+	{ 4300, 3 },	// 17 Luck Ring
+	{ 6200, 3 },	// 18 Focus Amulet (placeholder - no continuous effect without task)
+	{ 7500, 3 },	// 19 Power Elixir
+	{ 4600, 3 },	// 20 Spirit Stone
+	{ 3900, 3 },	// 21 Anti-Crit Amulet
+	{ 5100, 3 },	// 22 Evasion Bracelet
+	{ 3400, 3 }		// 23 Regen Ring (one-time boost)
 };
 
-// Flag-uri per jucător
+// Nume iteme RO / EN
+new const g_SI_Name_RO[MAX_SPECIAL][] =
+{
+	"Inel de Experienta", "Amuletă Critică", "Brățară de Forță", "Inel de Yang",
+	"Amuletă Berserk", "Inel de Piercing", "Amuletă Lifesteal", "Brățară Skill Power",
+	"Amuletă de Armură", "Inel de Viață", "Boost HP Instant", "Inel de Mana",
+	"Amuletă Reflect", "Scut Magic", "Binecuvântare Divină", "Papuci de Vânt",
+	"Pergament Binecuvântat", "Inel de Noroc", "Amuletă de Focus", "Elixir de Putere",
+	"Piatra Spiritului", "Amuletă Anti-Crit", "Brățară de Evaziune", "Inel de Regenerare"
+};
+
+new const g_SI_Name_EN[MAX_SPECIAL][] =
+{
+	"Experience Ring", "Critical Amulet", "Strength Bracelet", "Yang Ring",
+	"Berserk Amulet", "Piercing Ring", "Lifesteal Amulet", "Skill Power Bracelet",
+	"Armor Amulet", "Life Ring", "Instant HP Boost", "Mana Ring",
+	"Reflect Amulet", "Magic Shield", "Divine Blessing", "Wind Shoes",
+	"Blessed Scroll", "Luck Ring", "Focus Amulet", "Power Elixir",
+	"Spirit Stone", "Anti-Crit Amulet", "Evasion Bracelet", "Regen Ring"
+};
+
+// Descrieri RO / EN (actualizate - fara regen continuu)
+new const g_SI_Desc_RO[MAX_SPECIAL][] =
+{
+	"+50% XP din kill-uri", "+30% sansa crit (x2 dmg)", "+20 STR temporar", "+50% Yang din kill-uri",
+	"+40% dmg, -15% defense", "Ignora 35% din armura inamicului", "15% din damage ca heal", "+25% damage general",
+	"+35 defense", "+60 Max HP", "+80 HP instant", "+80 Max MP + 40 MP",
+	"Reflecta 25% din damage primit", "Reduce damage-ul primit cu 22%", "+20 defense + 50 HP", "+60 viteza de miscare",
+	"Urmatorul upgrade = 100% succes", "+30% Yang extra + sansa bonus XP", "Cooldown skill-uri redus (efectiv)", "+12 la toate stat-urile",
+	"La kill: +40 MP si +25 HP", "Reduce damage-ul critic primit cu 40%", "12% sansa sa eviti complet un hit", "+40 MP + 30 HP instant"
+};
+
+new const g_SI_Desc_EN[MAX_SPECIAL][] =
+{
+	"+50% XP from kills", "+30% crit chance (x2 dmg)", "+20 temporary STR", "+50% Yang from kills",
+	"+40% dmg, -15% defense", "Ignore 35% of enemy armor", "15% of damage as heal", "+25% general damage",
+	"+35 defense", "+60 Max HP", "+80 HP instant", "+80 Max MP + 40 MP",
+	"Reflect 25% of received damage", "Reduce received damage by 22%", "+20 defense + 50 HP", "+60 movement speed",
+	"Next upgrade = 100% success", "+30% extra Yang + chance bonus XP", "Skill cooldowns reduced (effective)", "+12 to all stats",
+	"On kill: +40 MP and +25 HP", "Reduce critical damage taken by 40%", "12% chance to fully dodge a hit", "+40 MP + 30 HP instant"
+};
+
+// Helpers multi-language
+stock GetSI_Name(id, idx, output[], len)
+{
+	if (idx < 0 || idx >= MAX_SPECIAL)
+	{
+		copy(output, len, "???");
+		return;
+	}
+	new lang[8];
+	get_user_info(id, "lang", lang, charsmax(lang));
+	if (equali(lang, "en"))
+		copy(output, len, g_SI_Name_EN[idx]);
+	else
+		copy(output, len, g_SI_Name_RO[idx]);
+}
+
+stock GetSI_Desc(id, idx, output[], len)
+{
+	if (idx < 0 || idx >= MAX_SPECIAL)
+	{
+		copy(output, len, "???");
+		return;
+	}
+	new lang[8];
+	get_user_info(id, "lang", lang, charsmax(lang));
+	if (equali(lang, "en"))
+		copy(output, len, g_SI_Desc_EN[idx]);
+	else
+		copy(output, len, g_SI_Desc_RO[idx]);
+}
+
+// Flag-uri per jucator
 new bool:g_BoughtThisRound[MAX_PLAYERS + 1][MAX_SPECIAL];
 new bool:g_Active[MAX_PLAYERS + 1][MAX_SPECIAL];
 
-// Evitare recursivitate la Reflect Damage
+// Evitare recursivitate Reflect
 new bool:g_IsReflectingDamage = false;
 
 // ======================== PRECACHE & INIT ========================
 public plugin_precache()
 {
-	// Sunet esential pentru meniurile CS 1.6 / AMXX
 	precache_sound("buttons/bell1.wav");
 }
 
 public plugin_init()
 {
 	register_plugin(PLUGIN, VERSION, AUTHOR);
+	register_dictionary("metin2Shop.txt");
 
-	// Acces shop prin radio (Z / X / C)
 	register_clcmd("radio1", "cmd_shop_offensive");
 	register_clcmd("radio2", "cmd_shop_defensive");
 	register_clcmd("radio3", "cmd_shop_special");
 
-	// Alternativ și prin say
 	register_clcmd("say /shopm2", "cmd_shop_menu");
 	register_clcmd("say /m2shop", "cmd_shop_menu");
 
-	// Round start/end
+	// Round management
 	RegisterHookChain(RG_CSGameRules_RestartRound, "OnRoundRestart", true);
 	register_event("HLTV", "OnRoundStart", "a", "1=0", "2=0");
 
-	// Damage hook
+	// Damage
 	RegisterHookChain(RG_CBasePlayer_TakeDamage, "OnTakeDamage_Pre", false);
 	RegisterHookChain(RG_CBasePlayer_TakeDamage, "OnTakeDamage_Post", true);
 
-	// Spawn - aplică bonusuri HP / speed
+	// Spawn - reaplica speed / HP daca e activ
 	RegisterHookChain(RG_CBasePlayer_Spawn, "OnPlayerSpawn", true);
-
-	// Task pentru regenerare HP/MP
-	set_task(1.0, "Task_Regen", _, _, _, "b");
 }
 
 public plugin_cfg()
 {
 	if (!LibraryExists("metin2_rpg", LibType_Library))
 	{
-		set_fail_state("[Metin2Shop] metin2_rpg library nu a fost găsită! Încarcă mai întâi Metin2Core.");
+		set_fail_state("[Metin2Shop] metin2_rpg library not found! Load Metin2Core first.");
 	}
 }
 
@@ -175,10 +257,12 @@ public cmd_shop_special(id)
 
 public cmd_shop_menu(id)
 {
-	new menu = menu_create("\y[Metin2] Shop Special", "shop_main_handler");
-	menu_additem(menu, "\wOfensiv \y(Z / radio1)", "1");
-	menu_additem(menu, "\wDefensiv \y(X / radio2)", "2");
-	menu_additem(menu, "\wSpecial / Utility \y(C / radio3)", "3");
+	if (!is_user_connected(id)) return PLUGIN_HANDLED;
+
+	new menu = menu_create(fmt("%L", id, "M2SHOP_TITLE"), "shop_main_handler");
+	menu_additem(menu, fmt("%L", id, "M2SHOP_CAT_OFFENSIVE"), "1");
+	menu_additem(menu, fmt("%L", id, "M2SHOP_CAT_DEFENSIVE"), "2");
+	menu_additem(menu, fmt("%L", id, "M2SHOP_CAT_SPECIAL"), "3");
 	menu_setprop(menu, MPROP_EXIT, MEXIT_ALL);
 	menu_display(id, menu);
 	return PLUGIN_HANDLED;
@@ -208,11 +292,15 @@ stock ShowShopMenu(id, category)
 	new title[64];
 	new money = cs_get_user_money(id);
 
+	new lang[8];
+	get_user_info(id, "lang", lang, charsmax(lang));
+	new bool:is_en = equali(lang, "en") ? true : false;
+
 	switch (category)
 	{
-		case 1: formatex(title, charsmax(title), "\y[Ofensiv] Shop - $%d", money);
-		case 2: formatex(title, charsmax(title), "\y[Defensiv] Shop - $%d", money);
-		case 3: formatex(title, charsmax(title), "\y[Special] Shop - $%d", money);
+		case 1: formatex(title, charsmax(title), is_en ? "\y[Offensive] Shop - $%d" : "\y[Ofensiv] Shop - $%d", money);
+		case 2: formatex(title, charsmax(title), is_en ? "\y[Defensive] Shop - $%d" : "\y[Defensiv] Shop - $%d", money);
+		case 3: formatex(title, charsmax(title), is_en ? "\y[Special] Shop - $%d" : "\y[Special] Shop - $%d", money);
 		default: return;
 	}
 
@@ -223,20 +311,23 @@ stock ShowShopMenu(id, category)
 		if (g_SpecialItems[i][SI_Category] != category)
 			continue;
 
+		new szName[48];
+		GetSI_Name(id, i, szName, charsmax(szName));
+
 		new tmp[96];
 		if (g_BoughtThisRound[id][i])
-			formatex(tmp, charsmax(tmp), "\d%s - CUMPĂRAT", g_SpecialItems[i][SI_Name]);
+			formatex(tmp, charsmax(tmp), is_en ? "\d%s - BOUGHT" : "\d%s - CUMPARAT", szName);
 		else if (g_Active[id][i])
-			formatex(tmp, charsmax(tmp), "\y%s - ACTIV", g_SpecialItems[i][SI_Name]);
+			formatex(tmp, charsmax(tmp), is_en ? "\y%s - ACTIVE" : "\y%s - ACTIV", szName);
 		else
-			formatex(tmp, charsmax(tmp), "\w%s \y$%d", g_SpecialItems[i][SI_Name], g_SpecialItems[i][SI_Cost]);
+			formatex(tmp, charsmax(tmp), "\w%s \y$%d", szName, g_SpecialItems[i][SI_Cost]);
 
 		new info[8];
 		formatex(info, charsmax(info), "%d", i);
 		menu_additem(menu, tmp, info);
 	}
 
-	menu_additem(menu, "\rÎnapoi", "99");
+	menu_additem(menu, fmt("%L", id, "M2SHOP_BACK"), "99");
 	menu_setprop(menu, MPROP_EXIT, MEXIT_ALL);
 	menu_display(id, menu);
 }
@@ -272,13 +363,16 @@ stock BuySpecialItem(id, idx)
 {
 	if (!is_user_connected(id) || !is_user_alive(id))
 	{
-		client_print_color(id, print_team_default, "^4[Metin2Shop]^1 Trebuie să fii în viață ca să cumperi!");
+		client_print_color(id, print_team_default, "%L", id, "M2SHOP_NEED_ALIVE");
 		return;
 	}
 
+	new szName[48];
+	GetSI_Name(id, idx, szName, charsmax(szName));
+
 	if (g_BoughtThisRound[id][idx])
 	{
-		client_print_color(id, print_team_default, "^4[Metin2Shop]^1 Ai cumpărat deja ^3%s^1 în această rundă!", g_SpecialItems[idx][SI_Name]);
+		client_print_color(id, print_team_default, "%L", id, "M2SHOP_ALREADY_BOUGHT", szName);
 		ShowShopMenu(id, g_SpecialItems[idx][SI_Category]);
 		return;
 	}
@@ -288,7 +382,7 @@ stock BuySpecialItem(id, idx)
 
 	if (money < cost)
 	{
-		client_print_color(id, print_team_default, "^4[Metin2Shop]^1 Nu ai destui bani! Cost: ^3$%d^1 | Ai: ^3$%d", cost, money);
+		client_print_color(id, print_team_default, "%L", id, "M2SHOP_NOT_ENOUGH", cost, money);
 		ShowShopMenu(id, g_SpecialItems[idx][SI_Category]);
 		return;
 	}
@@ -300,88 +394,85 @@ stock BuySpecialItem(id, idx)
 
 	ApplyItemEffect(id, idx);
 
-	client_print_color(id, print_team_default, "^4[Metin2Shop]^1 Ai cumpărat ^3%s^1 pentru ^3$%d^1!", g_SpecialItems[idx][SI_Name], cost);
-	client_print_color(id, print_team_default, "^4[Metin2Shop]^1 Efect: ^3%s^1 | Durată: până la finalul rundei", g_SpecialItems[idx][SI_Desc]);
+	// Un singur mesaj scurt (anti-overflow)
+	client_print_color(id, print_team_default, "%L", id, "M2SHOP_BOUGHT", szName, cost);
 
 	ShowShopMenu(id, g_SpecialItems[idx][SI_Category]);
 }
 
-// ======================== APPLY EFFECTS ========================
+// ======================== APPLY EFFECTS (INSTANT) ========================
 stock ApplyItemEffect(id, idx)
 {
+	if (!is_user_alive(id)) return;
+
 	switch (idx)
 	{
-		case 9: // Inel de Viață +60 Max HP
+		case 9: // Life Ring +60 Max HP
 		{
-			if (is_user_alive(id))
-			{
-				new hp = get_user_health(id);
-				set_user_health(id, hp + 60);
-			}
+			new hp = get_user_health(id);
+			set_user_health(id, hp + 60);
 		}
-		case 11: // Inel de Mana +80 MaxMP
+		case 10: // Instant HP Boost (ex-regen)
+		{
+			new hp = get_user_health(id);
+			set_user_health(id, hp + 80);
+		}
+		case 11: // Mana Ring +80 MaxMP + 40 MP
 		{
 			new maxmp = get_user_m2_maxmp(id);
 			set_user_m2_maxmp(id, maxmp + 80);
 			set_user_m2_mp(id, get_user_m2_mp(id) + 40);
 		}
-		case 15: // Papuci de Vânt +60 speed
+		case 14: // Divine Blessing +50 HP (in loc de regen)
 		{
-			if (is_user_alive(id))
-			{
-				new Float:speed = get_user_maxspeed(id);
-				set_user_maxspeed(id, speed + 60.0);
-			}
+			new hp = get_user_health(id);
+			set_user_health(id, hp + 50);
 		}
-		case 16: // Pergament Binecuvântat
+		case 15: // Wind Shoes +60 speed
+		{
+			new Float:speed = get_user_maxspeed(id);
+			set_user_maxspeed(id, speed + 60.0);
+		}
+		case 16: // Blessed Scroll
 		{
 			m2_set_force_upgrade(id, true);
-			client_print_color(id, print_team_default, "^4[Metin2Shop]^1 ^3Pergamentul^1 e activ - următorul /upgrade are 100%% succes!");
+			client_print_color(id, print_team_default, "%L", id, "M2SHOP_SCROLL_ACTIVE");
 		}
-		case 19: // Elixir de Putere +12 all stats
+		case 19: // Power Elixir +12 all stats
 		{
 			new maxmp = get_user_m2_maxmp(id);
 			set_user_m2_maxmp(id, maxmp + 96);
-			if (is_user_alive(id))
-			{
-				new hp = get_user_health(id);
-				set_user_health(id, hp + 120);
-			}
+			new hp = get_user_health(id);
+			set_user_health(id, hp + 120);
+		}
+		case 23: // Regen Ring (one-time)
+		{
+			new mp = get_user_m2_mp(id);
+			new maxmp = get_user_m2_maxmp(id);
+			set_user_m2_mp(id, min(mp + 40, maxmp));
+			new hp = get_user_health(id);
+			set_user_health(id, hp + 30);
 		}
 	}
 }
 
-// ======================== SPAWN - REAPLICĂ SPEED / HP ========================
+// ======================== SPAWN - REAPLICA SPEED / HP ========================
 public OnPlayerSpawn(id)
 {
 	if (!is_user_alive(id)) return;
 
-	if (g_Active[id][15]) set_task(0.1, "DelayedSpeed", id);
-	if (g_Active[id][9]) set_task(0.15, "DelayedHP", id);
-	if (g_Active[id][19]) set_task(0.2, "DelayedElixir", id);
-}
-
-public DelayedSpeed(id)
-{
-	if (is_user_alive(id) && g_Active[id][15])
+	// Reaplica doar ce se pierde la respawn
+	if (g_Active[id][15])
 	{
 		new Float:speed = get_user_maxspeed(id);
 		set_user_maxspeed(id, speed + 60.0);
 	}
-}
-
-public DelayedHP(id)
-{
-	if (is_user_alive(id) && g_Active[id][9])
+	if (g_Active[id][9])
 	{
 		new hp = get_user_health(id);
 		set_user_health(id, hp + 60);
 	}
-}
-
-public DelayedElixir(id)
-{
-	if (is_user_alive(id) && g_Active[id][19])
+	if (g_Active[id][19])
 	{
 		new hp = get_user_health(id);
 		set_user_health(id, hp + 120);
@@ -401,57 +492,53 @@ public OnTakeDamage_Pre(victim, inflictor, attacker, Float:damage, damagebits)
 	// === ATTACKER BUFFS ===
 	if (is_user_alive(attacker))
 	{
-		// Crit (idx 1)
+		// Crit (1)
 		if (g_Active[attacker][1] && random_num(1, 100) <= 30)
 		{
 			final *= 2.0;
-			client_print_color(attacker, print_team_default, "^4[Metin2Shop]^1 ^3CRITIC^1 cu Amuletă Critică!");
+			// Fara print aici - cauza overflow la spam
 		}
 
-		// Brățară STR (idx 2)
+		// STR Bracelet (2)
 		if (g_Active[attacker][2]) final += 30.0;
 
-		// Berserk (idx 4) +40% dmg
+		// Berserk (4)
 		if (g_Active[attacker][4]) final *= 1.40;
 
-		// Skill Power (idx 7) +25%
+		// Skill Power (7)
 		if (g_Active[attacker][7]) final *= 1.25;
 
-		// Elixir (idx 19)
+		// Elixir (19)
 		if (g_Active[attacker][19]) final += 18.0;
+
+		// Piercing (5)
+		if (g_Active[attacker][5]) final *= 1.15;
 	}
 
 	// === VICTIM BUFFS ===
 	if (is_user_alive(victim))
 	{
-		// Evaziune (idx 22) 12%
+		// Evasion (22)
 		if (g_Active[victim][22] && random_num(1, 100) <= 12)
 		{
 			SetHookChainArg(4, ATYPE_FLOAT, 0.0);
-			client_print_color(victim, print_team_default, "^4[Metin2Shop]^1 ^3EVAZIUNE^1! Ai evitat hit-ul.");
 			return HC_CONTINUE;
 		}
 
-		// Scut Magic (idx 13) -22%
+		// Magic Shield (13)
 		if (g_Active[victim][13]) final *= 0.78;
 
-		// Armură (idx 8) +35 defense
+		// Armor (8)
 		if (g_Active[victim][8]) final -= 35.0;
 
-		// Binecuvântare (idx 14) +20 defense
+		// Divine Blessing (14)
 		if (g_Active[victim][14]) final -= 20.0;
 
-		// Anti-Crit (idx 21)
+		// Anti-Crit (21)
 		if (g_Active[victim][21] && final > damage * 1.5) final *= 0.60;
 
 		// Elixir defense
 		if (g_Active[victim][19]) final -= 12.0;
-	}
-
-	// Piercing
-	if (is_user_alive(attacker) && g_Active[attacker][5])
-	{
-		final *= 1.15;
 	}
 
 	if (final < 1.0) final = 1.0;
@@ -467,7 +554,7 @@ public OnTakeDamage_Post(victim, inflictor, attacker, Float:damage, damagebits)
 	if (attacker == victim || damage < 1.0)
 		return HC_CONTINUE;
 
-	// Lifesteal (idx 6)
+	// Lifesteal (6)
 	if (g_Active[attacker][6] && is_user_alive(attacker))
 	{
 		new heal = floatround(damage * 0.15);
@@ -478,7 +565,7 @@ public OnTakeDamage_Post(victim, inflictor, attacker, Float:damage, damagebits)
 		}
 	}
 
-	// Reflect (idx 12) - Prevenire Buclă Infinită / Crash
+	// Reflect (12) - anti-loop
 	if (g_Active[victim][12] && is_user_alive(attacker) && !g_IsReflectingDamage)
 	{
 		new Float:reflect = damage * 0.25;
@@ -502,33 +589,23 @@ public m2_player_kill(killer, victim, xp, yang)
 	new extra_xp = 0;
 	new extra_yang = 0;
 
-	// Inel XP (0)
+	// Experience Ring (0)
 	if (g_Active[killer][0])
-	{
 		extra_xp = xp / 2;
-		client_print_color(killer, print_team_default, "^4[Metin2Shop]^1 Inel XP: ^3+%d XP^1 bonus!", extra_xp);
-	}
 
-	// Inel Yang (3)
+	// Yang Ring (3)
 	if (g_Active[killer][3])
-	{
 		extra_yang = yang / 2;
-		client_print_color(killer, print_team_default, "^4[Metin2Shop]^1 Inel Yang: ^3+%d Yang^1 bonus!", extra_yang);
-	}
 
-	// Inel de Noroc (17)
+	// Luck Ring (17)
 	if (g_Active[killer][17])
 	{
 		extra_yang += yang * 30 / 100;
 		if (random_num(1, 100) <= 25)
-		{
-			new bonus = xp / 3;
-			extra_xp += bonus;
-			client_print_color(killer, print_team_default, "^4[Metin2Shop]^1 Noroc: ^3+%d XP^1 extra!", bonus);
-		}
+			extra_xp += xp / 3;
 	}
 
-	// Piatra Spiritului (20)
+	// Spirit Stone (20)
 	if (g_Active[killer][20])
 	{
 		new mp = get_user_m2_mp(killer);
@@ -540,7 +617,6 @@ public m2_player_kill(killer, victim, xp, yang)
 			new hp = get_user_health(killer);
 			set_user_health(killer, hp + 25);
 		}
-		client_print_color(killer, print_team_default, "^4[Metin2Shop]^1 Piatra Spiritului: ^3+40 MP / +25 HP^1");
 	}
 
 	if (extra_xp > 0)
@@ -554,60 +630,4 @@ public m2_player_kill(killer, victim, xp, yang)
 		new current = get_user_m2_yang(killer);
 		set_user_m2_yang(killer, current + extra_yang);
 	}
-}
-
-// ======================== REGEN TASK ========================
-public Task_Regen()
-{
-	static sec_counter = 0;
-	sec_counter++;
-
-	for (new id = 1; id <= MaxClients; id++)
-	{
-		if (!is_user_alive(id)) continue;
-
-		// Regen HP (idx 10) +6/sec
-		if (g_Active[id][10])
-		{
-			set_user_health(id, get_user_health(id) + 6);
-		}
-
-		// Binecuvântare (idx 14) +4 HP/sec
-		if (g_Active[id][14])
-		{
-			set_user_health(id, get_user_health(id) + 4);
-		}
-
-		// Inel Mana (idx 11)
-		if (g_Active[id][11])
-		{
-			new mp = get_user_m2_mp(id);
-			new maxmp = get_user_m2_maxmp(id);
-			if (mp < maxmp) set_user_m2_mp(id, min(mp + 8, maxmp));
-		}
-
-		// Inel Regenerare (idx 23) la fiecare 2 secunde
-		if (g_Active[id][23] && (sec_counter % 2 == 0))
-		{
-			new mp = get_user_m2_mp(id);
-			new maxmp = get_user_m2_maxmp(id);
-			set_user_m2_mp(id, min(mp + 15, maxmp));
-			set_user_health(id, get_user_health(id) + 3);
-		}
-	}
-}
-
-// ======================== INFO LA CONNECT ========================
-public client_putinserver(id)
-{
-	set_task(5.0, "Task_WelcomeShop", id);
-}
-
-public Task_WelcomeShop(id)
-{
-	if (!is_user_connected(id)) return;
-
-	client_print_color(id, print_team_default, "^4[Metin2Shop]^1 Shop special disponibil!");
-	client_print_color(id, print_team_default, "^4[Metin2Shop]^1 Apasă ^3Z^1 (Ofensiv) | ^3X^1 (Defensiv) | ^3C^1 (Special)");
-	client_print_color(id, print_team_default, "^4[Metin2Shop]^1 Sau scrie ^3/m2shop^1 | Itemele țin până la finalul rundei.");
 }
